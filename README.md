@@ -9,12 +9,6 @@ mirror_server/
 ├── main.py                      # 主入口文件
 ├── requirements.txt             # 依赖列表
 ├── config.example.json          # 配置文件示例
-├── build.py                     # 多平台打包脚本
-├── Dockerfile                   # Docker 镜像构建文件
-├── docker-compose.yml           # Docker Compose 配置
-├── docker-deploy.sh             # Linux/macOS 部署脚本
-├── docker-deploy.bat            # Windows 部署脚本
-├── nginx.conf                   # Nginx 反向代理配置
 ├── core/                        # 核心模块
 │   ├── __init__.py
 │   ├── config.py                # 配置管理
@@ -283,10 +277,6 @@ git push -u origin main
 
 详细说明请参考 [BUILD.md](../BUILD.md)
 
-### Docker 部署
-
-项目提供完整的 Docker 支持，包括 Dockerfile、docker-compose 和便捷的部署脚本。
-
 #### 快速开始
 
 **Linux/macOS:**
@@ -306,34 +296,6 @@ chmod +x docker-deploy.sh
 ```batch
 docker-deploy.bat build
 docker-deploy.bat run
-```
-
-#### 手动使用 Docker
-
-```bash
-# 构建镜像
-docker build -t mirror-server:latest .
-
-# 运行容器
-docker run -d --name mirror-server -p 8080:8080 -v $(pwd)/downloads:/app/downloads mirror-server:latest
-```
-
-详细说明请参考 [DOCKER.md](DOCKER.md)
-
-### 使用 Docker Compose
-
-```bash
-# 启动服务
-docker-compose up -d
-
-# 使用 Nginx 反向代理
-docker-compose --profile with-nginx up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
 ```
 
 ### HTTPS 支持
