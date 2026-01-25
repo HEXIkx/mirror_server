@@ -1,0 +1,45 @@
+{
+  "server_name": "HYC下载站",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "base_dir": "./downloads",
+  
+  "api_version": "v1",
+  
+  "auth_type": "none",
+  "auth_user": "admin",
+  "auth_pass": "admin123",
+  "auth_token": "",
+  
+  "directory_listing": true,
+  "enable_stats": true,
+  "show_hash": false,
+  "calculate_hash": false,
+  "ignore_hidden": true,
+  "enable_range": true,
+  "sort_by": "name",
+  "sort_reverse": false,
+  
+  "max_upload_size": 1073741824,
+  "timeout": 30,
+  "verbose": 0,
+  
+  "access_log": "access.log",
+  "stats_file": "stats.json",
+  
+  "ssl_cert": "",
+  "ssl_key": "",
+  
+  "sync_sources": {
+    "example-ftp": {
+      "type": "ftp",
+      "host": "ftp.example.com",
+      "port": 21,
+      "username": "anonymous",
+      "password": "anonymous@",
+      "remote_path": "/",
+      "target": "example_ftp",
+      "auto_sync": false
+    }
+  }
+}
