@@ -12,16 +12,16 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8',3.9', '3.10', '3.11']
-    runs-on:  $ {{ matrix.os }}
+        python-version: ['3.8.10','3.9', '3.10', '3.11']
+    runs-on: ${{ matrix.os }}
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         
-      - name: 设置Python  $ {{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - name: 设置Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          python-version:  $ {{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
           
       - name: 安装依赖
         run: |
@@ -47,7 +47,7 @@ jobs:
       - name: 上传制品
         uses: actions/upload-artifact@v3
         with:
-          name: myapp- $ {{ matrix.os }}- $ {{ matrix.python-version }}
+          name: myapp-${{ matrix.os }}-${{ matrix.python-version }}
           path: dist/myapp*
 
   release:
@@ -62,8 +62,9 @@ jobs:
       - name: 创建GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          token:  $ {{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
+            ./artifacts/myapp-ubuntu-latest-3.8.10/*
             ./artifacts/myapp-ubuntu-latest-3.9/*
             ./artifacts/myapp-ubuntu-latest-3.10/*
             ./artifacts/myapp-ubuntu-latest-3.11/*
@@ -73,6 +74,6 @@ jobs:
             ./artifacts/myapp-macos-latest-3.9/*
             ./artifacts/myapp-macos-latest-3.10/*
             ./artifacts/myapp-macos-latest-3.11/*
-          tag_name:  $ {{ github.ref }}
-          release_name: "版本  $ {{ github.ref }}"
+          tag_name: ${{ github.ref }}
+          release_name: "版本 ${{ github.ref }}"
           generate_release_notes: true
