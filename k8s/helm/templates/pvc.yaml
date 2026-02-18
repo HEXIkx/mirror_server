@@ -1,0 +1,56 @@
+{{- if .Values.persistence.data.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hyc.fullname" . }}-data-pvc
+  labels:
+    {{- include "hyc.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.data.size }}
+  {{- if .Values.persistence.data.storageClass }}
+  storageClassName: {{ .Values.persistence.data.storageClass }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.persistence.downloads.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hyc.fullname" . }}-downloads-pvc
+  labels:
+    {{- include "hyc.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.downloads.size }}
+  {{- if .Values.persistence.downloads.storageClass }}
+  storageClassName: {{ .Values.persistence.downloads.storageClass }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.persistence.caches.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hyc.fullname" . }}-caches-pvc
+  labels:
+    {{- include "hyc.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.caches.size }}
+  {{- if .Values.persistence.caches.storageClass }}
+  storageClassName: {{ .Values.persistence.caches.storageClass }}
+  {{- end }}
+{{- end }}

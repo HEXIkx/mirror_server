@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 项目特定
+.claude/
+.spec-workflow/
+.zcf/
+*.log
+*.bak
+settings.json
+admin_keys.json
+api_keys.json
+auth_sessions.json
+auth_token.txt
+sync_state.json
+data/
+logs/
+downloads/
+cache/
+
+# OS
+.DS_Store
+Thumbs.db

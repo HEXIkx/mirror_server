@@ -1,0 +1,113 @@
+# ============================================
+# PostgreSQL 数据库部署 (可选)
+# ============================================
+
+---
+# StorageClass (如果需要动态供应)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hyc-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+
+---
+# PersistentVolume - PostgreSQL 数据
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hyc-postgres-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hyc-storage
+  hostPath:
+    path: /data/hyc-postgres
+    type: DirectoryOrCreate
+
+---
+# PersistentVolumeClaim - PostgreSQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hyc-postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: hyc-storage
+
+---
+# Secret - PostgreSQL 凭据
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hyc-postgres-secret
+type: Opaque
+stringData:
+  POSTGRES_DB: hyc
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: your-secure-password
+
+---
+# Service - PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: hyc-postgres
+spec:
+  selector:
+    app: hyc-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None
+
+---
+# Deployment - PostgreSQL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyc-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hyc-postgres
+  template:
+    metadata:
+      labels:
+        app: hyc-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          envFrom:
+            - secretRef:
+                name: hyc-postgres-secret
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: hyc-postgres-pvc

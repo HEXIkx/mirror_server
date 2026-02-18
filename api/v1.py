@@ -13,22 +13,72 @@ import shutil
 import cgi
 import zipfile
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import parse_qs
 
 from core.utils import format_file_size, get_file_hash, sanitize_filename, is_safe_path
+from core.api_auth import check_endpoint_auth
+from core.database import get_db
+from core.sync_scheduler import get_sync_scheduler, init_database_sync
+
+# 添加常见图片类型的 MIME 映射（解决某些系统缺少映射的问题）
+mimetypes.add_type('image/svg+xml', '.svg')
+mimetypes.add_type('image/webp', '.webp')
+mimetypes.add_type('image/bmp', '.bmp')
+mimetypes.add_type('image/tiff', '.tiff')
+mimetypes.add_type('image/x-icon', '.ico')
+mimetypes.add_type('image/jpeg', '.jpg')
 
 
 class APIv1:
     """API v1 - 基础功能实现"""
-    
+
     def __init__(self, config):
         self.config = config
+
+        # 初始化数据库
+        self.db_enabled = config.get('database', {}).get('enabled', True)
+        if self.db_enabled:
+            # 优先使用已初始化的数据库实例
+            self.db = config.get('_db_instance')
+            if not self.db:
+                self.db = get_db(config)
+
+            # 初始化同步调度器
+            self.scheduler = get_sync_scheduler(config)
+            self.file_ops = init_database_sync(config, self.db)[2]
+        else:
+            self.db = None
+            self.scheduler = None
+            self.file_ops = None
         
     def handle_request(self, handler, method, path, query_params):
         """处理API v1请求"""
-        
-        # 文件管理API
+
+        # 认证检查 - 只对需要认证的端点进行
+        auth_manager = getattr(handler, 'auth_manager', None)
+
+        # 构建完整的API路径
+        full_path = f"api/v1/{path}"
+
+        # 获取认证要求（只对需要认证的端点检查）
+        auth_check = check_endpoint_auth(method, full_path, auth_manager) if auth_manager else {'required': False}
+
+        if auth_check['required']:
+            if auth_manager:
+                auth_result = auth_manager.validate_request(handler, 'admin')
+                if not auth_result.get('authenticated'):
+                    handler.send_response(401)
+                    handler.send_header('WWW-Authenticate', 'Bearer')
+                    handler.send_header('Access-Control-Allow-Origin', '*')
+                    handler.send_json_response({
+                        "error": "认证Required",
+                        "code": "UNAUTHORIZED",
+                        "required_permission": auth_check.get('permission')
+                    })
+                    return
+
+        # 文件管理API (GET /api/v1/files 不需要认证)
         if path == 'files':
             if method == 'GET':
                 self.api_list_files(handler, query_params)
@@ -69,6 +119,11 @@ class APIv1:
             elif method == 'DELETE':
                 if sync_action.startswith('sources/'):
                     self.api_remove_sync_source(handler, sync_action[8:])
+                else:
+                    handler.send_error(404)
+            elif method == 'PUT':
+                if sync_action.startswith('sources/'):
+                    self.api_update_sync_source(handler, sync_action[8:])
                 else:
                     handler.send_error(404)
             else:
@@ -139,58 +194,97 @@ class APIv1:
     # ==================== 文件管理API ====================
     
     def api_list_files(self, handler, query_params):
-        """API: 列出所有文件"""
+        """API: 列出文件"""
         recursive = query_params.get('recursive', ['false'])[0].lower() == 'true'
-        
-        files = []
-    
-        for root, dirs, filenames in os.walk(self.config['base_dir']):
-            for filename in filenames:
-                file_path = os.path.relpath(os.path.join(root, filename), self.config['base_dir']).replace("\\", "/")
-                full_path = os.path.join(self.config['base_dir'], file_path)
-    
-                if self.config.get('ignore_hidden', True) and any(part.startswith('.') for part in file_path.split(os.sep)):
-                    continue
-    
-                try:
-                    size = os.path.getsize(full_path)
-                    mtime = os.path.getmtime(full_path)
-                    mime_type, _ = mimetypes.guess_type(full_path)
-                    if mime_type is None:
-                        mime_type = "application/octet-stream"
-    
-                    download_count = 0
-                    if self.config.get('enable_stats', True):
-                        download_count = handler.get_download_count(file_path)
-    
-                    files.append({
-                        "name": filename,
-                        "path": file_path,
-                        "size": size,
-                        "size_formatted": format_file_size(size),
-                        "type": mime_type,
-                        "modified": datetime.fromtimestamp(mtime).isoformat(),
-                        "download_count": download_count,
-                        "sha256": get_file_hash(full_path) if self.config.get('calculate_hash', False) else None
-                    })
-                except OSError:
-                    continue
-    
-            if not recursive:
-                break
 
-        # 排序
+        # 获取请求的路径
+        path_param = query_params.get('path', [''])[0]
+
+        # 处理根路径和空路径
+        if path_param in ['', '/', '\\']:
+            target_dir = self.config['base_dir']
+        else:
+            base_dir = self.config['base_dir']
+            # 去掉前导斜杠，避免 os.path.join 忽略 base_dir
+            path_param = path_param.lstrip('/')
+            target_dir = os.path.join(base_dir, path_param)
+
+            # 安全检查
+            if not is_safe_path(base_dir, target_dir):
+                handler.send_json_response({"error": "Invalid path"}, 403)
+                return
+
+            if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
+                handler.send_json_response({"error": "Directory not found"}, 404)
+                return
+
+        files = []
+        dirs = []
+
+        try:
+            items = os.listdir(target_dir)
+
+            for item in items:
+                item_path = os.path.join(target_dir, item)
+                rel_path = os.path.relpath(item_path, self.config['base_dir']).replace("\\", "/")
+
+                # 隐藏文件检查
+                if self.config.get('ignore_hidden', True) and item.startswith('.'):
+                    continue
+
+                if os.path.isdir(item_path):
+                    dirs.append({
+                        "name": item,
+                        "path": rel_path + "/",
+                        "is_dir": True,
+                        "modified": datetime.fromtimestamp(os.path.getmtime(item_path)).isoformat()
+                    })
+                else:
+                    try:
+                        size = os.path.getsize(item_path)
+                        mtime = os.path.getmtime(item_path)
+                        mime_type, _ = mimetypes.guess_type(item_path)
+                        if mime_type is None:
+                            mime_type = "application/octet-stream"
+
+                        download_count = 0
+                        if self.config.get('enable_stats', True):
+                            download_count = handler.get_download_count(rel_path)
+
+                        files.append({
+                            "name": item,
+                            "path": rel_path,
+                            "size": size,
+                            "size_formatted": format_file_size(size),
+                            "type": mime_type,
+                            "modified": datetime.fromtimestamp(mtime).isoformat(),
+                            "download_count": download_count,
+                            "sha256": get_file_hash(item_path) if self.config.get('calculate_hash', False) else None
+                        })
+                    except OSError:
+                        continue
+        except PermissionError:
+            handler.send_json_response({"error": "Permission denied"}, 403)
+            return
+        except Exception as e:
+            handler.send_json_response({"error": str(e)}, 500)
+            return
+
+        # 排序（目录在前，文件在后）
         sort_by = handler.headers.get('X-Sort-By', self.config.get('sort_by', 'name'))
         reverse = handler.headers.get('X-Sort-Reverse', str(self.config.get('sort_reverse', False))).lower() == 'true'
 
         if sort_by == 'name':
+            dirs.sort(key=lambda x: x['name'].lower(), reverse=reverse)
             files.sort(key=lambda x: x['name'].lower(), reverse=reverse)
         elif sort_by == 'size':
             files.sort(key=lambda x: x['size'], reverse=reverse)
         elif sort_by == 'modified':
+            dirs.sort(key=lambda x: x['modified'], reverse=reverse)
             files.sort(key=lambda x: x['modified'], reverse=reverse)
-        elif sort_by == 'downloads':
-            files.sort(key=lambda x: x.get('download_count', 0), reverse=reverse)
+
+        # 合并目录和文件
+        all_items = dirs + files
 
         # 分页
         try:
@@ -200,19 +294,21 @@ class APIv1:
             page = 1
             per_page = 50
 
-        total = len(files)
+        total = len(all_items)
         start = (page - 1) * per_page
         end = start + per_page
-        paginated_files = files[start:end]
+        paginated_items = all_items[start:end]
 
         handler.send_json_response({
-            "files": paginated_files,
+            "files": paginated_items,
             "pagination": {
                 "page": page,
                 "per_page": per_page,
                 "total": total,
-                "total_pages": (total + per_page - 1) // per_page
-            }
+                "total_pages": (total + per_page - 1) // per_page if per_page > 0 else 0
+            },
+            "path": path_param,
+            "has_parent": bool(path_param)
         })
     
     def api_get_file_info(self, handler, filename):
@@ -257,25 +353,34 @@ class APIv1:
     
     def api_file_preview(self, handler, file_path):
         """API: 文件预览"""
+        import html as html_escape
+
         full_path = os.path.join(self.config['base_dir'], file_path)
-        
+
         if not is_safe_path(self.config['base_dir'], full_path) or not os.path.isfile(full_path):
             handler.send_json_response({"error": "File not found or access denied"}, 404)
             return
-            
+
         max_preview_size = self.config.get('max_preview_size', 10 * 1024 * 1024)
         file_size = os.path.getsize(full_path)
-        
-        if file_size > max_preview_size:
+
+        # 图片文件不限制预览大小（允许任意大小的图片）
+        mime_type_check, _ = mimetypes.guess_type(full_path)
+        file_ext_check = file_path.lower().split('.')[-1] if '.' in file_path else ''
+        image_exts = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tif', 'tiff']
+        is_image_file = (mime_type_check and mime_type_check.startswith('image/')) or (file_ext_check in image_exts)
+
+        if file_size > max_preview_size and not is_image_file:
             handler.send_json_response({
                 "error": f"File too large for preview (max {format_file_size(max_preview_size)})",
                 "file_size": file_size,
                 "max_preview_size": max_preview_size
             }, 413)
             return
-            
+
         mime_type, _ = mimetypes.guess_type(full_path)
-        
+        file_ext = file_path.lower().split('.')[-1] if '.' in file_path else ''
+
         preview_data = {
             "path": file_path,
             "name": os.path.basename(file_path),
@@ -283,30 +388,73 @@ class APIv1:
             "type": mime_type or "application/octet-stream",
             "preview_available": False
         }
-    
+
         try:
-            if mime_type and mime_type.startswith('text/'):
-                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read(5000)
-                    preview_data.update({
-                        "preview_available": True,
-                        "preview_type": "text",
-                        "content": content,
-                        "truncated": len(content) == 5000
-                    })
-                    
-            elif mime_type and mime_type.startswith('image/'):
+            # 图片文件（PNG、JPG、GIF、BMP、WebP、SVG 等）
+            # 常见图片扩展名列表（不区分大小写）
+            image_exts = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tif', 'tiff']
+            is_image = (mime_type and mime_type.startswith('image/')) or (file_ext.lower() in image_exts)
+
+            if is_image and file_ext.lower() != 'svg':
+                # 确定 MIME 类型
+                img_mime = mime_type
+                if not img_mime:
+                    # 根据扩展名推断 MIME
+                    ext_mime_map = {
+                        'png': 'image/png',
+                        'jpg': 'image/jpeg',
+                        'jpeg': 'image/jpeg',
+                        'gif': 'image/gif',
+                        'bmp': 'image/bmp',
+                        'webp': 'image/webp',
+                        'ico': 'image/x-icon',
+                        'tif': 'image/tiff',
+                        'tiff': 'image/tiff',
+                    }
+                    img_mime = ext_mime_map.get(file_ext.lower(), 'image/png')
+
+                # 普通图片（非 SVG）- 直接作为图片预览
+                # 图片预览最大 20MB
+                max_read = 5 * 1024 * 1024 if img_mime == 'image/gif' else 20 * 1024 * 1024
                 with open(full_path, 'rb') as f:
-                    image_data = f.read(1024 * 1024)
+                    image_data = f.read(max_read)
                     base64_data = base64.b64encode(image_data).decode('utf-8')
                     preview_data.update({
                         "preview_available": True,
                         "preview_type": "image",
-                        "data_url": f"data:{mime_type};base64,{base64_data}",
-                        "truncated": file_size > 1024 * 1024
+                        "data_url": f"data:{img_mime};base64,{base64_data}",
+                        "truncated": file_size > max_read
                     })
-                    
-            elif mime_type == 'application/json' or file_path.endswith('.json'):
+
+            # SVG 文件 - 作为图片预览，同时保存源代码
+            elif file_ext == 'svg':
+                # 先尝试作为图片预览
+                try:
+                    with open(full_path, 'rb') as f:
+                        image_data = f.read(1024 * 1024)
+                        base64_data = base64.b64encode(image_data).decode('utf-8')
+                        preview_data.update({
+                            "preview_available": True,
+                            "preview_type": "image",
+                            "data_url": f"data:image/svg+xml;base64,{base64_data}",
+                            "truncated": file_size > 1024 * 1024
+                        })
+                except Exception:
+                    pass
+
+                # 同时保存源代码用于查看
+                try:
+                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read(10000)
+                        preview_data.update({
+                            "svg_content": content,
+                            "svg_truncated": len(content) == 10000
+                        })
+                except Exception:
+                    pass
+
+            # JSON 文件
+            elif mime_type == 'application/json' or file_ext == 'json':
                 with open(full_path, 'r', encoding='utf-8') as f:
                     content = f.read(10000)
                     try:
@@ -324,10 +472,100 @@ class APIv1:
                             "content": content,
                             "truncated": len(content) == 10000
                         })
-                        
+
+            # Markdown 文件
+            elif mime_type == 'text/markdown' or file_ext in ['md', 'markdown']:
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(10000)
+                    preview_data.update({
+                        "preview_available": True,
+                        "preview_type": "markdown",
+                        "content": content,
+                        "truncated": len(content) == 10000
+                    })
+
+            # XML 文件（排除 SVG）
+            elif mime_type in ['application/xml'] or (file_ext == 'xml' and not mime_type.startswith('image/')):
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(10000)
+                    preview_data.update({
+                        "preview_available": True,
+                        "preview_type": "xml",
+                        "content": content,
+                        "truncated": len(content) == 10000
+                    })
+
+            # CSV 文件
+            elif mime_type == 'text/csv' or file_ext == 'csv':
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(5000)
+                    preview_data.update({
+                        "preview_available": True,
+                        "preview_type": "csv",
+                        "content": content,
+                        "truncated": len(content) == 5000
+                    })
+
+            # YAML 文件
+            elif mime_type in ['application/x-yaml', 'text/yaml'] or file_ext in ['yaml', 'yml']:
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(10000)
+                    preview_data.update({
+                        "preview_available": True,
+                        "preview_type": "yaml",
+                        "content": content,
+                        "truncated": len(content) == 10000
+                    })
+
+            # 音频文件
+            elif mime_type and mime_type.startswith('audio/'):
+                with open(full_path, 'rb') as f:
+                    audio_data = f.read(128 * 1024)
+                    base64_data = base64.b64encode(audio_data).decode('utf-8')
+                    preview_data.update({
+                        "preview_available": True,
+                        "preview_type": "audio",
+                        "data_url": f"data:{mime_type};base64,{base64_data}",
+                        "truncated": file_size > 128 * 1024
+                    })
+
+            # PDF 文件
+            elif mime_type == 'application/pdf':
+                with open(full_path, 'rb') as f:
+                    pdf_data = f.read(1024 * 1024)
+                    base64_data = base64.b64encode(pdf_data).decode('utf-8')
+                    preview_data.update({
+                        "preview_available": True,
+                        "preview_type": "pdf",
+                        "data_url": f"data:{mime_type};base64,{base64_data}",
+                        "truncated": file_size > 1024 * 1024
+                    })
+
+            # 特殊扩展名的文本文件
+            elif file_ext in ['js', 'ts', 'jsx', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'cs', 'swift', 'kt', 'php', 'sh', 'bat', 'ps1', 'lua', 'r', 'scala', 'yaml', 'yml', 'ini', 'conf', 'config', 'env', 'toml', 'log', 'properties', 'gradle', 'makefile', 'dockerfile', 'nginx', 'apache', 'toml', 'sql', 'prql', 'vcl', 'hlsl', 'glsl', 'asm', 's', 'S']:
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(10000)
+                    preview_data.update({
+                        "preview_available": True,
+                        "preview_type": "text",
+                        "content": content,
+                        "truncated": len(content) == 10000
+                    })
+
+            # 文本文件
+            elif mime_type and mime_type.startswith('text/'):
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(10000)
+                    preview_data.update({
+                        "preview_available": True,
+                        "preview_type": "text",
+                        "content": content,
+                        "truncated": len(content) == 10000
+                    })
+
         except Exception as e:
             preview_data["preview_error"] = str(e)
-            
+
         handler.send_json_response(preview_data)
     
     def api_delete_file(self, handler, rel_path):
@@ -347,11 +585,31 @@ class APIv1:
             return False
         if not os.path.exists(full_path):
             return False
+
+        # 获取文件ID用于数据库（在会话中立即提取数据）
+        file_id = None
+        if self.db:
+            try:
+                with self.db.session() as session:
+                    record = session.query(FileRecord.file_id).filter(
+                        FileRecord.path == rel_path,
+                        FileRecord.is_deleted == False
+                    ).first()
+                    if record:
+                        file_id = record.file_id
+            except Exception:
+                pass
+
         try:
             if os.path.isdir(full_path):
                 shutil.rmtree(full_path)
             else:
                 os.unlink(full_path)
+
+            # 同步删除到数据库
+            if self.db and file_id:
+                self.db.delete_file(file_id)
+
             if self.config.get('enable_stats', True):
                 stats = handler.load_stats()
                 if rel_path in stats:
@@ -378,6 +636,17 @@ class APIv1:
                     return
 
                 os.makedirs(full_path, exist_ok=True)
+
+                # 同步到数据库
+                if self.db:
+                    self.db.add_file(
+                        file_id=hashlib.md5(dir_path.encode()).hexdigest(),
+                        path=dir_path.rstrip('/') + '/',
+                        name=os.path.basename(dir_path.rstrip('/')),
+                        is_dir=True,
+                        created_at=time.time()
+                    )
+
                 handler.send_json_response({"success": True, "path": dir_path})
             except json.JSONDecodeError:
                 handler.send_json_response({"error": "Invalid JSON data"}, 400)
@@ -455,49 +724,128 @@ class APIv1:
         })
     
     # ==================== 同步API ====================
-    
+
     def api_get_sync_sources(self, handler):
         """获取所有同步源"""
+        # 检查 sync_manager 是否存在
+        if not hasattr(handler, 'sync_manager') or handler.sync_manager is None:
+            handler.send_json_response({"sources": [], "count": 0, "error": "同步管理器未初始化"})
+            return
+
         sources = handler.sync_manager.sync_sources
-        handler.send_json_response({"sources": sources, "count": len(sources)})
+        # 转换为数组格式
+        sources_list = []
+        for name, config in sources.items():
+            item = {"name": name}
+            item.update(config)
+            # 获取同步状态中的额外信息
+            if name in handler.sync_manager.sync_status:
+                status = handler.sync_manager.sync_status[name]
+                item['next_sync'] = status.get('next_sync')
+                item['last_sync'] = status.get('last_sync')
+            sources_list.append(item)
+        handler.send_json_response({"sources": sources_list, "count": len(sources_list)})
 
     def api_get_sync_status(self, handler):
         """获取同步状态"""
+        # 检查 sync_manager 是否存在
+        if not hasattr(handler, 'sync_manager') or handler.sync_manager is None:
+            handler.send_json_response({"running": False, "progress": 0, "sources": {}, "error": "同步管理器未初始化"})
+            return
+
         status = handler.sync_manager.get_sync_status()
         handler.send_json_response(status)
 
     def api_add_sync_source(self, handler):
         """添加同步源"""
+        # 检查 sync_manager 是否存在
+        if not hasattr(handler, 'sync_manager') or handler.sync_manager is None:
+            handler.send_json_response({"error": "同步管理器未初始化", "success": False}, 500)
+            return
+
         content_length = int(handler.headers.get('Content-Length', 0))
         if content_length == 0:
             handler.send_json_response({"error": "没有提供数据"}, 400)
             return
-            
+
         try:
             data = json.loads(handler.rfile.read(content_length))
             name = data.get('name')
             config = data.get('config')
-            
+
             if not name or not config:
                 handler.send_json_response({"error": "缺少名称或配置"}, 400)
                 return
-                
+
+            print(f"[API] 添加同步源: {name}")
             handler.sync_manager.add_sync_source(name, config)
+            print(f"[API] 添加同步源完成: {name}")
             handler.send_json_response({"success": True, "name": name})
-            
+
         except Exception as e:
             handler.send_json_response({"error": str(e)}, 400)
 
     def api_remove_sync_source(self, handler, name):
         """移除同步源"""
+        # 检查 sync_manager 是否存在
+        if not hasattr(handler, 'sync_manager') or handler.sync_manager is None:
+            handler.send_json_response({"error": "同步管理器未初始化", "success": False}, 500)
+            return
+
         if not name:
             handler.send_json_response({"error": "未指定同步源名称"}, 400)
             return
         handler.sync_manager.remove_sync_source(name)
         handler.send_json_response({"success": True})
 
+    def api_update_sync_source(self, handler, name):
+        """更新同步源配置（包括定时同步）"""
+        # 检查 sync_manager 是否存在
+        if not hasattr(handler, 'sync_manager') or handler.sync_manager is None:
+            handler.send_json_response({"error": "同步管理器未初始化", "success": False}, 500)
+            return
+
+        if not name:
+            handler.send_json_response({"error": "未指定同步源名称"}, 400)
+            return
+
+        content_length = int(handler.headers.get('Content-Length', 0))
+        if content_length == 0:
+            handler.send_json_response({"error": "没有提供数据"}, 400)
+            return
+
+        try:
+            data = json.loads(handler.rfile.read(content_length))
+            config = data.get('config', {})
+
+            with handler.sync_manager.sync_lock:
+                if name not in handler.sync_manager.sync_sources:
+                    handler.send_json_response({"error": "同步源不存在"}, 404)
+                    return
+
+                # 更新配置
+                handler.sync_manager.sync_sources[name].update(config)
+
+                # 更新同步状态中的定时配置
+                if name in handler.sync_manager.sync_status:
+                    if 'schedule' in config:
+                        handler.sync_manager.sync_status[name]['schedule'] = config['schedule']
+                    if hasattr(handler.sync_manager, '_calculate_next_sync'):
+                        handler.sync_manager._calculate_next_sync(name)
+
+            handler.sync_manager.save_sync_state()
+            handler.send_json_response({"success": True, "name": name})
+
+        except Exception as e:
+            handler.send_json_response({"error": str(e)}, 400)
+
     def api_start_sync(self, handler):
         """开始同步"""
+        # 检查 sync_manager 是否存在
+        if not hasattr(handler, 'sync_manager') or handler.sync_manager is None:
+            handler.send_json_response({"error": "同步管理器未初始化", "success": False}, 500)
+            return
+
         # 简化实现 - 需要从请求体获取参数
         content_length = int(handler.headers.get('Content-Length', 0))
         if content_length:
@@ -520,6 +868,11 @@ class APIv1:
 
     def api_stop_sync(self, handler):
         """停止同步"""
+        # 检查 sync_manager 是否存在
+        if not hasattr(handler, 'sync_manager') or handler.sync_manager is None:
+            handler.send_json_response({"error": "同步管理器未初始化", "success": False}, 500)
+            return
+
         content_length = int(handler.headers.get('Content-Length', 0))
         if content_length:
             try:
@@ -653,7 +1006,20 @@ class APIv1:
                                 print(f"设置文件权限失败: {e}")
                         
                         rel_path = os.path.relpath(full_path, self.config['base_dir']).replace("\\", "/")
-    
+
+                        # 同步到数据库
+                        if self.db:
+                            file_hash = get_file_hash(full_path) if self.config.get('calculate_hash', False) else None
+                            self.db.add_file(
+                                file_id=hashlib.md5(rel_path.encode()).hexdigest(),
+                                path=rel_path,
+                                name=filename,
+                                size=file_size,
+                                hash=file_hash,
+                                is_dir=False,
+                                created_at=time.time()
+                            )
+
                         uploaded_files.append({
                             "filename": filename,
                             "path": rel_path,
@@ -772,9 +1138,36 @@ class APIv1:
                         os.makedirs(os.path.dirname(target_path), exist_ok=True)
                         if operation == "move":
                             shutil.move(full_path, target_path)
+
+                            # 同步移动到数据库 (删除旧记录，创建新记录)
+                            if self.db:
+                                old_record = self.db.get_file_by_path(file_path)
+                                if old_record:
+                                    self.db.delete_file(old_record.file_id)
+
+                                rel_path = os.path.relpath(target_path, self.config['base_dir']).replace("\\", "/")
+                                self.db.add_file(
+                                    file_id=hashlib.md5(rel_path.encode()).hexdigest(),
+                                    path=rel_path,
+                                    name=os.path.basename(target_path),
+                                    size=old_record.size if old_record else 0,
+                                    hash=old_record.hash if old_record else None,
+                                    created_at=time.time()
+                                )
                         else:
                             shutil.copy2(full_path, target_path)
-                        
+
+                            # 同步复制到数据库
+                            if self.db:
+                                rel_path = os.path.relpath(target_path, self.config['base_dir']).replace("\\", "/")
+                                self.db.add_file(
+                                    file_id=hashlib.md5(rel_path.encode()).hexdigest(),
+                                    path=rel_path,
+                                    name=os.path.basename(target_path),
+                                    size=os.path.getsize(target_path),
+                                    created_at=time.time()
+                                )
+
                         results.append({
                             "file": file_path,
                             "status": "success",
@@ -849,7 +1242,18 @@ class APIv1:
                         zipf.write(full_path, arcname)
             
             rel_path = os.path.relpath(archive_path, self.config['base_dir']).replace("\\", "/")
-            
+
+            # 同步到数据库
+            if self.db:
+                self.db.add_file(
+                    file_id=hashlib.md5(rel_path.encode()).hexdigest(),
+                    path=rel_path,
+                    name=os.path.basename(archive_path),
+                    size=os.path.getsize(archive_path),
+                    is_dir=False,
+                    created_at=time.time()
+                )
+
             handler.send_json_response({
                 "operation": "compress",
                 "archive_path": rel_path,
@@ -877,7 +1281,24 @@ class APIv1:
                         handler.send_json_response({"error": "Unsafe archive contents"}, 403)
                         return
                 zipf.extractall(extract_dir)
-            
+
+            # 同步提取的文件到数据库
+            if self.db:
+                extracted_files = []
+                for member in zipf.namelist():
+                    member_path = os.path.join(extract_dir, member)
+                    if os.path.isfile(member_path):
+                        rel_member_path = os.path.relpath(member_path, self.config['base_dir']).replace("\\", "/")
+                        self.db.add_file(
+                            file_id=hashlib.md5(rel_member_path.encode()).hexdigest(),
+                            path=rel_member_path,
+                            name=os.path.basename(member),
+                            size=os.path.getsize(member_path),
+                            is_dir=False,
+                            created_at=time.time()
+                        )
+                        extracted_files.append(rel_member_path)
+
             handler.send_json_response({
                 "operation": "extract",
                 "extract_dir": target_dir,
@@ -897,7 +1318,9 @@ class APIv1:
         file_types = {}
         total_downloads = 0
 
-        for root, dirs, files in os.walk(self.config['base_dir']):
+        # 获取 base_dir，添加默认值处理
+        base_dir = self.config.get('base_dir', './downloads')
+        for root, dirs, files in os.walk(base_dir):
             total_dirs += len(dirs)
             total_files += len(files)
             for filename in files:
@@ -914,8 +1337,50 @@ class APIv1:
 
         if self.config.get('enable_stats', True):
             stats = handler.load_stats()
-            for count in stats.values():
-                total_downloads += count
+            file_stats_downloads = sum(stats.values())
+
+            # 计算今日和本周下载 - 从数据库获取准确数据
+            now = datetime.now()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+            week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+            downloads_today = 0
+            downloads_week = 0
+            total_downloads = 0
+
+            # 尝试从数据库获取准确统计 - 使用 self.db
+            try:
+                from core.database import DownloadRecord
+                db = self.db
+                if db and db.engine:
+                    with db.session() as session:
+                        from sqlalchemy import func
+                        # 累计下载次数
+                        total_downloads = session.query(func.count(DownloadRecord.id)).filter(
+                            DownloadRecord.success == True
+                        ).scalar() or 0
+
+                        # 今日下载次数
+                        downloads_today = session.query(func.count(DownloadRecord.id)).filter(
+                            DownloadRecord.download_time >= today_start,
+                            DownloadRecord.success == True
+                        ).scalar() or 0
+
+                        # 本周下载次数
+                        downloads_week = session.query(func.count(DownloadRecord.id)).filter(
+                            DownloadRecord.download_time >= week_start,
+                            DownloadRecord.success == True
+                        ).scalar() or 0
+                else:
+                    # 回退到使用文件统计
+                    total_downloads = file_stats_downloads
+                    downloads_today = file_stats_downloads
+                    downloads_week = file_stats_downloads
+            except Exception:
+                # 回退到使用文件统计
+                total_downloads = file_stats_downloads
+                downloads_today = file_stats_downloads
+                downloads_week = file_stats_downloads
 
         sorted_file_types = dict(sorted(file_types.items(), key=lambda x: x[1], reverse=True))
 
@@ -926,6 +1391,8 @@ class APIv1:
             "total_size_formatted": format_file_size(total_size),
             "file_types": sorted_file_types,
             "total_downloads": total_downloads,
+            "downloads_today": downloads_today,
+            "downloads_week": downloads_week,
             "updated": datetime.now().isoformat()
         })
     
@@ -982,7 +1449,7 @@ class APIv1:
         """API: 获取配置信息"""
         handler.send_json_response({
             "server_name": self.config.get("server_name", "Mirror Server"),
-            "version": "2.0",
+            "version": "2.2",
             "base_dir": self.config['base_dir'],
             "directory_listing": self.config.get('directory_listing', True),
             "max_upload_size": self.config.get('max_upload_size'),
@@ -1040,66 +1507,6 @@ class APIv1:
             params = mc_path[5:].split('/')
             if method == 'GET':
                 self.api_mc_info(handler, params)
-            else:
-                handler.send_error(405)
-
-        elif mc_path == 'server':
-            if method == 'GET':
-                self.api_mc_server_info(handler)
-            elif method == 'POST':
-                self.api_mc_server_action(handler)
-            else:
-                handler.send_error(405)
-
-        elif mc_path == 'players':
-            if method == 'GET':
-                self.api_mc_players(handler)
-            else:
-                handler.send_error(405)
-
-        elif mc_path.startswith('player/'):
-            player_name = mc_path[7:]
-            if method == 'GET':
-                self.api_mc_player_info(handler, player_name)
-            elif method == 'DELETE':
-                self.api_mc_kick_player(handler, player_name)
-            else:
-                handler.send_error(405)
-
-        elif mc_path == 'mods':
-            if method == 'GET':
-                self.api_mc_mods(handler)
-            elif method == 'POST':
-                self.api_mc_upload_mod(handler)
-            else:
-                handler.send_error(405)
-
-        elif mc_path.startswith('mod/'):
-            mod_path = mc_path[4:]
-            if method == 'DELETE':
-                self.api_mc_delete_mod(handler, mod_path)
-            else:
-                handler.send_error(405)
-
-        elif mc_path == 'world':
-            if method == 'GET':
-                self.api_mc_world_info(handler)
-            elif method == 'POST':
-                self.api_mc_world_backup(handler)
-            else:
-                handler.send_error(405)
-
-        elif mc_path == 'config':
-            if method == 'GET':
-                self.api_mc_config(handler)
-            elif method == 'PUT':
-                self.api_mc_update_config(handler)
-            else:
-                handler.send_error(405)
-
-        elif mc_path == 'logs':
-            if method == 'GET':
-                self.api_mc_logs(handler)
             else:
                 handler.send_error(405)
 
@@ -1321,287 +1728,6 @@ class APIv1:
         }
 
         handler.send_json_response(file_info)
-
-    def api_mc_server_info(self, handler):
-        """API: 获取MC服务器信息"""
-        mc_dir = os.path.join(self.config['base_dir'], 'minecraft')
-        servers = []
-
-        if os.path.exists(mc_dir):
-            for item in os.listdir(mc_dir):
-                server_path = os.path.join(mc_dir, item)
-                if os.path.isdir(server_path):
-                    # 检查是否有 server.properties
-                    props_file = os.path.join(server_path, 'server.properties')
-                    server_name = item
-                    version = "Unknown"
-
-                    if os.path.exists(props_file):
-                        try:
-                            with open(props_file, 'r', encoding='utf-8', errors='ignore') as f:
-                                for line in f:
-                                    line = line.strip()
-                                    if line.startswith('server-name='):
-                                        server_name = line.split('=', 1)[1].strip()
-                                    elif line.startswith('version='):
-                                        version = line.split('=', 1)[1].strip()
-                        except Exception:
-                            pass
-
-                    servers.append({
-                        "name": server_name,
-                        "path": item,
-                        "version": version,
-                        "size": self._get_dir_size(server_path),
-                        "status": "offline"
-                    })
-
-        handler.send_json_response({
-            "count": len(servers),
-            "servers": servers
-        })
-
-    def api_mc_server_action(self, handler):
-        """API: 执行MC服务器操作（启动/停止/重启）"""
-        try:
-            content_length = int(handler.headers.get('Content-Length', 0))
-            data = json.loads(handler.rfile.read(content_length).decode('utf-8'))
-            action = data.get('action', 'start')
-
-            result = {
-                "success": True,
-                "action": action,
-                "message": f"Server {action} command sent"
-            }
-            handler.send_json_response(result)
-        except Exception as e:
-            handler.send_json_response({"error": str(e)}, 500)
-
-    def api_mc_players(self, handler):
-        """API: 获取在线玩家列表"""
-        players = {
-            "online": [],
-            "max": 20,
-            "count": 0
-        }
-        handler.send_json_response(players)
-
-    def api_mc_player_info(self, handler, player_name):
-        """API: 获取玩家信息"""
-        player_info = {
-            "name": player_name,
-            "online": False,
-            "first_seen": None,
-            "last_seen": None,
-            "play_time": 0
-        }
-        handler.send_json_response(player_info)
-
-    def api_mc_kick_player(self, handler, player_name):
-        """API: 踢出玩家"""
-        result = {
-            "success": True,
-            "message": f"Player {player_name} kicked"
-        }
-        handler.send_json_response(result)
-
-    def api_mc_mods(self, handler):
-        """API: 获取已安装的模组列表"""
-        mc_dir = os.path.join(self.config['base_dir'], 'minecraft')
-        all_mods = {}
-
-        if os.path.exists(mc_dir):
-            for server_name in os.listdir(mc_dir):
-                server_path = os.path.join(mc_dir, server_name)
-                if os.path.isdir(server_path):
-                    mods_dir = os.path.join(server_path, 'mods')
-                    if os.path.exists(mods_dir):
-                        mods = []
-                        for file in os.listdir(mods_dir):
-                            if file.endswith('.jar'):
-                                mod_path = os.path.join(mods_dir, file)
-                                mods.append({
-                                    "name": file,
-                                    "size": os.path.getsize(mod_path),
-                                    "enabled": True
-                                })
-                        all_mods[server_name] = mods
-
-        handler.send_json_response(all_mods)
-
-    def api_mc_upload_mod(self, handler):
-        """API: 上传模组到指定服务器"""
-        content_type = handler.headers.get('Content-Type', '')
-        if 'multipart/form-data' in content_type:
-            content_length = int(handler.headers.get('Content-Length', 0))
-            form_data = cgi.FieldStorage(
-                fp=handler.rfile,
-                headers=handler.headers,
-                environ={'REQUEST_METHOD': 'POST',
-                         'CONTENT_TYPE': content_type}
-            )
-
-            # 获取服务器名称
-            server_name = form_data.getvalue('server', 'default')
-            mc_dir = os.path.join(self.config['base_dir'], 'minecraft')
-            mods_dir = os.path.join(mc_dir, server_name, 'mods')
-
-            if not os.path.exists(mods_dir):
-                os.makedirs(mods_dir, exist_ok=True)
-
-            for key in form_data.keys():
-                item = form_data[key]
-                if key == 'file' and item.filename:
-                    filename = sanitize_filename(item.filename)
-                    filepath = os.path.join(mods_dir, filename)
-                    with open(filepath, 'wb') as f:
-                        f.write(item.file.read())
-
-                    handler.send_json_response({
-                        "success": True,
-                        "server": server_name,
-                        "filename": filename,
-                        "size": os.path.getsize(filepath)
-                    })
-                    return
-
-        handler.send_json_response({"error": "No file uploaded"}, 400)
-
-    def api_mc_delete_mod(self, handler, mod_path):
-        """API: 删除模组 (路径格式: server_name/mod_name)"""
-        parts = mod_path.split('/', 1)
-        if len(parts) != 2:
-            handler.send_json_response({"error": "Invalid path format. Use: server_name/mod_name"}, 400)
-            return
-
-        server_name, mod_name = parts
-        mc_dir = os.path.join(self.config['base_dir'], 'minecraft')
-        mods_dir = os.path.join(mc_dir, server_name, 'mods')
-        mod_file = os.path.join(mods_dir, mod_name)
-
-        if os.path.exists(mod_file) and is_safe_path(self.config['base_dir'], mod_file):
-            os.remove(mod_file)
-            handler.send_json_response({
-                "success": True,
-                "server": server_name,
-                "mod": mod_name,
-                "message": f"Mod {mod_name} deleted from {server_name}"
-            })
-        else:
-            handler.send_json_response({"error": "Mod not found"}, 404)
-
-    def api_mc_world_info(self, handler):
-        """API: 获取世界信息"""
-        mc_dir = os.path.join(self.config['base_dir'], 'minecraft')
-        all_worlds = {}
-
-        if os.path.exists(mc_dir):
-            for server_name in os.listdir(mc_dir):
-                server_path = os.path.join(mc_dir, server_name)
-                if os.path.isdir(server_path):
-                    worlds = []
-                    for item in os.listdir(server_path):
-                        item_path = os.path.join(server_path, item)
-                        if os.path.isdir(item_path) and 'world' in item:
-                            worlds.append({
-                                "name": item,
-                                "size": self._get_dir_size(item_path),
-                                "last_modified": datetime.fromtimestamp(os.path.getmtime(item_path)).isoformat()
-                            })
-                    all_worlds[server_name] = worlds
-
-        handler.send_json_response(all_worlds)
-
-    def api_mc_world_backup(self, handler):
-        """API: 创建世界备份"""
-        backup_dir = os.path.join(self.config['base_dir'], 'backups')
-        if not os.path.exists(backup_dir):
-            os.makedirs(backup_dir)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_name = f"world_backup_{timestamp}"
-
-        handler.send_json_response({
-            "success": True,
-            "backup_name": backup_name,
-            "message": "World backup initiated"
-        })
-
-    def api_mc_config(self, handler):
-        """API: 获取服务器配置"""
-        mc_dir = os.path.join(self.config['base_dir'], 'minecraft')
-        all_configs = {}
-
-        if os.path.exists(mc_dir):
-            for server_name in os.listdir(mc_dir):
-                server_path = os.path.join(mc_dir, server_name)
-                if os.path.isdir(server_path):
-                    config_file = os.path.join(server_path, 'server.properties')
-                    config = {}
-
-                    if os.path.exists(config_file):
-                        with open(config_file, 'r', encoding='utf-8', errors='ignore') as f:
-                            for line in f:
-                                line = line.strip()
-                                if line and not line.startswith('#'):
-                                    if '=' in line:
-                                        key, value = line.split('=', 1)
-                                        config[key.strip()] = value.strip()
-
-                    all_configs[server_name] = config
-
-        handler.send_json_response(all_configs)
-
-    def api_mc_update_config(self, handler):
-        """API: 更新服务器配置"""
-        try:
-            content_length = int(handler.headers.get('Content-Length', 0))
-            data = json.loads(handler.rfile.read(content_length).decode('utf-8'))
-
-            config_file = os.path.join(self.config['base_dir'], 'server.properties')
-            lines = []
-
-            if os.path.exists(config_file):
-                with open(config_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    lines = f.readlines()
-
-            with open(config_file, 'w', encoding='utf-8') as f:
-                for key, value in data.items():
-                    lines.append(f"{key}={value}\n")
-                f.writelines(lines)
-
-            handler.send_json_response({
-                "success": True,
-                "message": "Config updated"
-            })
-        except Exception as e:
-            handler.send_json_response({"error": str(e)}, 500)
-
-    def api_mc_logs(self, handler):
-        """API: 获取服务器日志"""
-        mc_dir = os.path.join(self.config['base_dir'], 'minecraft')
-        all_logs = {}
-
-        if os.path.exists(mc_dir):
-            for server_name in os.listdir(mc_dir):
-                server_path = os.path.join(mc_dir, server_name)
-                if os.path.isdir(server_path):
-                    logs_dir = os.path.join(server_path, 'logs')
-                    logs = []
-
-                    if os.path.exists(logs_dir):
-                        log_file = os.path.join(logs_dir, 'latest.log')
-                        if os.path.exists(log_file):
-                            try:
-                                with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                                    lines = f.readlines()
-                                    logs = [line.strip() for line in lines[-100:]]  # 最后100行
-                            except Exception:
-                                pass
-
-                    all_logs[server_name] = logs
-
-        handler.send_json_response(all_logs)
 
     def _get_dir_size(self, path):
         """递归计算目录大小"""

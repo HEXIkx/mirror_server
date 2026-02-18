@@ -1,0 +1,52 @@
+# ============================================
+# HYC下载站 v2.2 - 轻量级 Docker Compose
+# 适用于: Raspberry Pi, 2CPU/1G 设备
+# ============================================
+
+services:
+  # 轻量级应用服务
+  hyc-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.lite
+    container_name: hyc-download-server
+    hostname: hyc-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=Asia/Shanghai
+      # 低端设备优化
+      - PRESET=ultra_low
+      - PYTHONOPTIMIZE=2
+      - HYC_LOW_MEMORY=1
+    volumes:
+      - ${DATA_PATH:-./data}:/data
+      - ${DOWNLOADS_PATH:-./downloads}:/downloads
+    deploy:
+      resources:
+        limits:
+          # 内存限制
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.hyc.version=2.2"
+      - "com.hyc.preset=ultra_low"
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  data:
+  downloads:
+  caches:

@@ -1,0 +1,237 @@
+# ============================================
+# HYC下载站 v2.2 - Kubernetes 部署配置
+# ============================================
+
+---
+# ConfigMap - 应用配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hyc-config
+  labels:
+    app: hyc-download-server
+data:
+  HYC_HOST: "0.0.0.0"
+  HYC_PORT: "8080"
+  HYC_BASE_DIR: "/downloads"
+  HYC_ENABLE_MONITOR: "true"
+  HYC_ENABLE_SYNC: "true"
+  HYC_ENABLE_MIRRORS: "true"
+  HYC_ENABLE_WS: "true"
+  HYC_ENABLE_SSE: "true"
+
+---
+# Secret - 数据库凭据
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hyc-secrets
+type: Opaque
+stringData:
+  # PostgreSQL 凭据
+  DB_HOST: "hyc-postgres"
+  DB_PORT: "5432"
+  DB_NAME: "hyc"
+  DB_USER: "postgres"
+  DB_PASSWORD: "your-password-here"
+
+  # Redis 凭据 (可选)
+  REDIS_HOST: "hyc-redis"
+  REDIS_PORT: "6379"
+
+---
+# PersistentVolumeClaim - 数据存储
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hyc-data-pvc
+  labels:
+    app: hyc-download-server
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# PersistentVolumeClaim - 下载目录
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hyc-downloads-pvc
+  labels:
+    app: hyc-download-server
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+# PersistentVolumeClaim - 缓存目录
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hyc-cache-pvc
+  labels:
+    app: hyc-download-server
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Deployment - 主应用
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyc-server
+  labels:
+    app: hyc-download-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hyc-download-server
+  template:
+    metadata:
+      labels:
+        app: hyc-download-server
+    spec:
+      containers:
+        - name: hyc-server
+          image: hyc-download-station:v2.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: hyc-config
+            - secretRef:
+                name: hyc-secrets
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
+            - name: downloads-volume
+              mountPath: /downloads
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: hyc-data-pvc
+        - name: downloads-volume
+          persistentVolumeClaim:
+            claimName: hyc-downloads-pvc
+        - name: cache-volume
+          persistentVolumeClaim:
+            claimName: hyc-cache-pvc
+
+---
+# Service - 内部服务
+apiVersion: v1
+kind: Service
+metadata:
+  name: hyc-server
+  labels:
+    app: hyc-download-server
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: hyc-download-server
+
+---
+# Ingress - 外部访问
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hyc-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "2G"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hyc.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hyc-server
+                port:
+                  number: 8080
+
+---
+# HorizontalPodAutoscaler - 自动扩缩容
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hyc-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hyc-server
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# ServiceMonitor - Prometheus 监控
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hyc-monitor
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: hyc-download-server
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

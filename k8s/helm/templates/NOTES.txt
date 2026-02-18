@@ -1,0 +1,31 @@
+=============================================
+HYC下载站 v2.2 已成功部署!
+=============================================
+
+1. 获取应用 URL:
+
+  {{- if .Values.ingress.enabled }}
+  {{- range $host := .Values.ingress.hosts }}
+    http://{{ $host.host }}
+  {{- end }}
+  {{- else }}
+  # Port Forward (开发环境)
+  kubectl port-forward svc/{{ include "hyc.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+
+  # 访问地址
+  http://localhost:{{ .Values.service.port }}
+  {{- end }}
+
+2. 管理界面:
+  http://<your-url>/api/ui/
+
+3. API 文档:
+  http://<your-url>/api/docs/
+
+4. 查看状态:
+  kubectl get pods -l {{ include "hyc.selectorLabels" . | trimSuffix "-" | replace "=" "=" | replace " " "" }}
+
+5. 查看日志:
+  kubectl logs -l {{ include "hyc.selectorLabels" . | trimSuffix "-" | replace "=" "=" | replace " " "" }} -f
+
+=============================================

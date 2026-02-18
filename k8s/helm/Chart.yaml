@@ -1,0 +1,28 @@
+# ============================================
+# HYC下载站 Helm Chart
+# ============================================
+
+apiVersion: v2
+name: hyc-download-station
+description: HYC下载站 v2.2 - 镜像文件服务器 + 下载加速源
+version: 2.2.0
+appVersion: "2.2.0"
+keywords:
+  - download-station
+  - mirror
+  - docker-registry
+  - apt-mirror
+  - pypi-mirror
+home: https://github.com/hyc-download-station
+maintainers:
+  - name: HYC Team
+    email: team@hyc.local
+dependencies:
+  - name: postgresql
+    version: 12.x.x
+    condition: postgresql.enabled
+    repository: "https://charts.bitnami.com/bitnami"
+  - name: redis
+    version: 18.x.x
+    condition: redis.enabled
+    repository: "https://charts.bitnami.com/bitnami"

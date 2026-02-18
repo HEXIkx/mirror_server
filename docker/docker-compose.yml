@@ -1,0 +1,87 @@
+# ============================================
+# HYC下载站 v2.2 - Docker Compose 配置
+# ============================================
+
+services:
+  # 主应用服务
+  hyc-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: hyc-download-server
+    hostname: hyc-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=Asia/Shanghai
+      # 数据库配置
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - DB_PATH=/data/hyc.db
+      # PostgreSQL (可选)
+      - DB_HOST=${DB_HOST:-}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-hyc}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASS=${DB_PASS:-}
+      # 外部数据库连接 (可选)
+      - DB_CONN_STR=${DB_CONN_STR:-}
+    volumes:
+      - ${DATA_PATH:-./data}:/data
+      - ${DOWNLOADS_PATH:-./downloads}:/downloads
+    networks:
+      - hyc-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.hyc.version=2.2"
+
+  # PostgreSQL 数据库 (可选)
+  hyc-db:
+    image: postgres:15-alpine
+    container_name: hyc-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME:-hyc}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASS:-postgres}
+      - TZ=Asia/Shanghai
+    volumes:
+      - ${DB_PATH:-./postgres}:/var/lib/postgresql/data
+    networks:
+      - hyc-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-hyc}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis 缓存 (可选，用于速率限制)
+  redis:
+    image: redis:7-alpine
+    container_name: hyc-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - ${REDIS_PATH:-./redis}:/data
+    networks:
+      - hyc-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  hyc-network:
+    driver: bridge
+
+volumes:
+  data:
+  downloads:
+  caches:
+  postgres:
+  redis:

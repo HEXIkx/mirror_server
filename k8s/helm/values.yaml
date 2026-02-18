@@ -1,0 +1,169 @@
+# ============================================
+# HYC下载站 Helm Chart - 默认配置
+# ============================================
+
+# 副本数
+replicaCount: 2
+
+# 镜像配置
+image:
+  repository: hyc-download-station
+  tag: v2.2
+  pullPolicy: IfNotPresent
+
+# 镜像拉取密钥 (如需要私有仓库)
+imagePullSecrets: []
+
+# 服务配置
+service:
+  type: ClusterIP
+  port: 8080
+
+# 入口配置 (Ingress)
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: hyc.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: hyc-tls
+  #   hosts:
+  #     - hyc.example.com
+
+# 资源配置
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+# 持久化配置
+persistence:
+  data:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+  downloads:
+    enabled: true
+    storageClass: ""
+    size: 100Gi
+  caches:
+    enabled: true
+    storageClass: ""
+    size: 50Gi
+
+# PostgreSQL (可选)
+postgresql:
+  enabled: false
+  auth:
+    database: hyc
+    username: postgres
+    password: "postgres-password"
+
+# Redis (可选)
+redis:
+  enabled: false
+  auth:
+    enabled: true
+    password: "redis-password"
+
+# 应用配置
+config:
+  # 基础配置
+  host: "0.0.0.0"
+  port: 8080
+  baseDir: "/downloads"
+  apiVersion: "v2"
+
+  # 功能开关
+  enableMonitor: true
+  enableSync: true
+  enableMirrors: true
+  enableWs: true
+  enableSse: true
+
+  # 数据库配置
+  database:
+    enabled: true
+    type: "postgresql"
+    syncInterval: 60
+
+  # 速率限制
+  rateLimit:
+    requestsPerMinute: 100
+    burstLimit: 20
+
+# 安全配置
+security:
+  # IP 白名单/黑名单
+  ip:
+    whitelist: []
+    blacklist: []
+
+  # SSL/TLS
+  ssl:
+    enabled: false
+    cert: ""
+    key: ""
+
+# 节点选择器
+nodeSelector: {}
+
+# 容忍
+tolerations: []
+
+# 亲和性
+affinity: {}
+
+# 探针
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# 滚动更新策略
+rollingUpdate:
+  maxSurge: 1
+  maxUnavailable: 0
+
+# 拓扑分布 (可选)
+topologySpreadConstraints: []
+
+# 自动扩缩容
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+# 监控指标
+metrics:
+  enabled: false
+  release: prometheus
+  interval: 15s

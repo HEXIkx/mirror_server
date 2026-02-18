@@ -1,0 +1,57 @@
+# ============================================
+# HYC下载站 v2.2 - 树莓派专用配置
+# 适用于: Raspberry Pi 3/4/5 (ARMv7/Arm64)
+# ============================================
+
+services:
+  # ARM 优化版本
+  hyc-server:
+    # 使用 ARM 专用镜像
+    image: ${REGISTRY:-hyc-download-station}:${TAG:-v2.2}-arm64
+    container_name: hyc-download-server
+    hostname: hyc-server
+    restart: unless-stopped
+    privileged: true  # 树莓派可能需要
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=Asia/Shanghai
+      # 树莓派优化
+      - PRESET=low
+      - PYTHONOPTIMIZE=2
+      - HYC_LOW_MEMORY=1
+      # ARM 优化
+      - PYTHONCPUCOUNT=2
+    volumes:
+      - ${DATA_PATH:-./data}:/data
+      - ${DOWNLOADS_PATH:-./downloads}:/downloads
+    deploy:
+      resources:
+        limits:
+          # Raspberry Pi 4: 4GB RAM
+          memory: 1G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.hyc.platform=raspberry-pi"
+      - "com.hyc.arch=arm64"
+
+    # 温度监控 (树莓派专用)
+    devices:
+      - /sys/class/thermal/thermal_zone0:/sys/class/thermal/thermal_zone0
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  data:
+  downloads:
+  caches:

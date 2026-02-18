@@ -1,0 +1,93 @@
+# ============================================
+# Redis 缓存部署 (可选，用于速率限制)
+# ============================================
+
+---
+# PersistentVolumeClaim - Redis
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hyc-redis-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Secret - Redis 凭据 (可选)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hyc-redis-secret
+type: Opaque
+stringData:
+  REDIS_PASSWORD: your-redis-password
+
+---
+# Service - Redis
+apiVersion: v1
+kind: Service
+metadata:
+  name: hyc-redis
+spec:
+  selector:
+    app: hyc-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+  clusterIP: None
+
+---
+# Deployment - Redis
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyc-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hyc-redis
+  template:
+    metadata:
+      labels:
+        app: hyc-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --maxmemory
+            - "256mb"
+            - --maxmemory-policy
+            - allkeys-lru
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: hyc-redis-pvc
+
+---
+# RedisCluster (可选，集群模式)
+# 如果需要高可用，可以改用 Redis Operator

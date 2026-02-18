@@ -24,6 +24,12 @@ def format_file_size(size_bytes: int) -> str:
 
 def get_file_hash(filepath: str, algorithm: str = 'sha256') -> str:
     """计算文件哈希值"""
+    if not filepath or not isinstance(filepath, str):
+        return "Error: Invalid filepath"
+
+    if not os.path.exists(filepath):
+        return "Error: File not found"
+
     try:
         hash_func = hashlib.new(algorithm)
         with open(filepath, 'rb') as f:

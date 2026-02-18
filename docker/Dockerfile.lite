@@ -1,0 +1,87 @@
+# ============================================
+# HYC下载站 v2.2 - 轻量级镜像 (X86_32/ARMv7)
+# 适用于低端设备: 2CPU/1G 内存
+# ============================================
+
+# 使用 Alpine Linux 作为基础镜像 (极简)
+FROM alpine:3.19 AS builder
+
+# 安装 Python 和构建工具
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    cargo \
+    rust
+
+# 创建虚拟环境
+ENV VENV=/opt/venv
+RUN python3 -m venv $VENV
+ENV PATH="$VENV/bin:$PATH"
+
+# 安装依赖 (使用 --no-cache-dir 减少体积)
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# ============================================
+# 运行阶段 - 极简镜像
+# ============================================
+FROM alpine:3.19
+
+# 安装最小运行时依赖
+RUN apk add --no-cache \
+    python3 \
+    libffi \
+    openssl \
+    libstdc++ \
+    tzdata \
+    && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone
+
+# 创建非 root 用户
+RUN adduser -D -s /bin/sh hyc
+
+# 设置工作目录
+WORKDIR /app
+
+# 从构建阶段复制虚拟环境
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# 复制应用代码
+COPY --chown=hyc:hyc main.py .
+COPY --chown=hyc:hyc core/ ./core/
+COPY --chown=hyc:hyc api/ ./api/
+COPY --chown=hyc:hyc handlers/ ./handlers/
+COPY --chown=hyc:hyc mirrors/ ./mirrors/
+
+# 创建数据目录
+RUN mkdir -p /data /downloads && chown -R hyc:hyc /data /downloads 
+
+# 设置用户
+USER hyc
+
+# 挂载卷
+VOLUME ["/data", "/downloads"]
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/health')" || exit 1
+
+# 启动命令 (使用虚拟环境中的 Python)
+CMD ["python", "main.py", \
+     "--host", "0.0.0.0", \
+     "--port", "8080", \
+     "--base-dir", "/downloads", \
+     "--config", "/data/config.json", \
+     "--memory-limit", "512M"]
+
+# 镜像元数据
+LABEL maintainer="HYC Download Station"
+LABEL description="HYC下载站 v2.2 - 轻量级版本"

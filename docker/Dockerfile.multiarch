@@ -1,0 +1,125 @@
+# ============================================
+# HYC下载站 v2.2 - 多架构交叉编译 Dockerfile
+# 支持: amd64, arm64, arm/v7, i386
+# 使用: docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t hyc:v2.2 .
+# ============================================
+
+# ============================================
+# 构建阶段 - 所有架构通用
+# ============================================
+FROM python:3.11-alpine AS builder
+
+# 安装构建依赖 (按架构)
+ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+        amd64|x86_64)   ARCH_OPTS="-march=x86-64" ;; \
+        arm64|aarch64)  ARCH_OPTS="-march=armv8-a" ;; \
+        armv7|arm)      ARCH_OPTS="-march=armv7-a" ;; \
+        i386|i686)      ARCH_OPTS="-march=i686" ;; \
+        *)              ARCH_OPTS="-march=native" ;; \
+    esac && \
+    apk add --no-cache \
+        python3 \
+        py3-pip \
+        gcc \
+        musl-dev \
+        libffi-dev \
+        openssl-dev \
+        cargo \
+        rust
+
+# 创建优化编译的虚拟环境
+ENV VENV=/opt/venv
+ENV CFLAGS="$ARCH_OPTS"
+ENV CXXFLAGS="$ARCH_OPTS"
+ENV LDFLAGS="-Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now"
+
+RUN python3 -m venv $VENV && \
+    $VENV/bin/pip install --upgrade pip wheel
+
+# 安装依赖
+COPY requirements.txt /tmp/requirements.txt
+RUN $VENV/bin/pip install --no-cache-dir \
+    --platform manylinux2014_${TARGETARCH} \
+    --only-binary=:all: \
+    -r /tmp/requirements.txt 2>/dev/null || \
+    $VENV/bin/pip install --no-cache-dir -r /tmp/requirements.txt
+
+# ============================================
+# 运行阶段 - 按架构选择基础镜像
+# ============================================
+# amd64
+FROM --platform=$TARGETOS/$TARGETARCH alpine:3.19 AS runner-amd64
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+CMD ["/opt/venv/bin/python", "/app/main.py"]
+
+# arm64
+FROM --platform=$TARGETOS/$TARGETARCH alpine:3.19 AS runner-arm64
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+CMD ["/opt/venv/bin/python", "/app/main.py"]
+
+# arm/v7
+FROM --platform=$TARGETOS/$TARGETARCH alpine:3.19 AS runner-armv7
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+CMD ["/opt/venv/bin/python", "/app/main.py"]
+
+# i386
+FROM --platform=$TARGETOS/$TARGETARCH alpine:3.19 AS runner-i386
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+CMD ["/opt/venv/bin/python", "/app/main.py"]
+
+# ============================================
+# 最终清单镜像
+# ============================================
+FROM --platform=$TARGETOS/$TARGETARCH alpine:3.19 AS final
+
+# 安装运行时依赖
+RUN apk add --no-cache \
+    libffi \
+    openssl \
+    libstdc++ \
+    tzdata \
+    && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone
+
+# 创建用户
+RUN adduser -D -s /bin/sh hyc
+
+# 复制虚拟环境
+COPY --from=builder --chown=hyc:hyc /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# 复制应用
+COPY --chown=hyc:hyc main.py .
+COPY --chown=hyc:hyc settings.json .
+COPY --chown=hyc:hyc requirements.txt .
+COPY --chown=hyc:hyc core/ ./core/
+COPY --chown=hyc:hyc api/ ./api/
+COPY --chown=hyc:hyc handlers/ ./handlers/
+COPY --chown=hyc:hyc mirrors/ ./mirrors/
+COPY --chown=hyc:hyc scripts/ ./scripts/
+
+# 创建数据目录
+RUN mkdir -p /data /downloads && chown -R hyc:hyc /data /downloads 
+
+USER hyc
+VOLUME ["/data", "/downloads"]
+EXPOSE 8080
+
+# 低内存模式
+ENV HYC_LOW_MEMORY=1
+ENV HYC_WORKERS=1
+ENV PYTHONOPTIMIZE=2
+ENV PYTHONDONTWRITEBYTECODE=1
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/health')" || exit 1
+
+CMD ["python", "main.py", \
+     "--host", "0.0.0.0", \
+     "--port", "8080", \
+     "--memory-limit", "256M"]

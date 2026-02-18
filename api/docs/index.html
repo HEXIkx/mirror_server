@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HYC下载站 API 文档</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #22c55e;
+            --primary-dark: #16a34a;
+            --bg: #111827;
+            --bg-card: #1f2937;
+            --bg-sidebar: #111827;
+            --text: #f9fafb;
+            --text-muted: #9ca3af;
+            --border: #374151;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        /* 顶部导航栏 - 移动端 */
+        .topbar {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+            padding: 0 16px;
+            z-index: 100;
+        }
+        .menu-toggle {
+            width: 40px;
+            height: 40px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            padding: 8px;
+        }
+        .menu-toggle span {
+            display: block;
+            width: 18px;
+            height: 2px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+        .menu-toggle.active span:nth-child(1) { transform: rotate(45deg) translate(4px, 4px); }
+        .menu-toggle.active span:nth-child(2) { opacity: 0; }
+        .menu-toggle.active span:nth-child(3) { transform: rotate(-45deg) translate(4px, -4px); }
+        .topbar-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin-left: 12px;
+        }
+
+        /* 遮罩层 */
+        .mask {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 199;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .mask.active { opacity: 1; }
+
+        /* 侧边栏 */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100vh;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px 0 120px 0;
+        }
+        .sidebar-title {
+            padding: 20px 16px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .sidebar-section {
+            padding: 8px 12px;
+        }
+        .sidebar-section-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 8px 4px;
+            font-weight: 600;
+        }
+        .nav-link {
+            display: block;
+            padding: 10px 12px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.15s;
+            margin: 2px 0;
+        }
+        .nav-link:hover {
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--text);
+        }
+        .nav-link.active {
+            background: var(--primary);
+            color: white;
+            font-weight: 500;
+        }
+        .nav-link.sub {
+            padding-left: 28px;
+            font-size: 13px;
+        }
+        .nav-link.sub2 {
+            padding-left: 40px;
+            font-size: 12px;
+        }
+
+        /* 主内容 */
+        .main {
+            margin-left: 280px;
+            padding: 24px 32px;
+            max-width: 900px;
+        }
+
+        /* 文档卡片 */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .card-title-sm {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin: 12px 0 8px;
+        }
+
+        /* API 方法标签 */
+        .method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .method-get { background: rgba(34, 197, 94, 0.15); color: var(--primary); }
+        .method-post { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+        .method-put { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+        .method-delete { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+        /* API 路径容器 - 让方法和路径对齐 */
+        .api-line {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .api-line + .param-table,
+        .api-line + p,
+        .api-line + .code {
+            margin-top: 8px;
+        }
+
+        /* API 路径 */
+        .api-path {
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 13px;
+            color: var(--text);
+            background: var(--bg);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            display: inline-block;
+            overflow-x: auto;
+            max-width: 100%;
+        }
+
+        /* 参数表格 */
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+        .param-table th,
+        .param-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .param-table th {
+            background: var(--bg);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .param-name {
+            font-family: 'SF Mono', Consolas, monospace;
+            color: #f97316;
+            font-size: 13px;
+        }
+        .param-type {
+            font-size: 11px;
+            color: var(--primary);
+            background: rgba(34, 197, 94, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        /* 代码块 */
+        .code {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            overflow-x: auto;
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 8px 0;
+        }
+        .code .k { color: #ff7b72; }
+        .code .s { color: #a5d6ff; }
+        .code .n { color: #79c0ff; }
+        .code .v { color: #ffa657; }
+
+        /* 认证表格 */
+        .auth-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+        }
+        .auth-row:last-child { border-bottom: none; }
+        .auth-name {
+            width: 100px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .auth-value {
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 13px;
+            color: #f97316;
+            background: rgba(249, 115, 22, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .auth-desc {
+            flex: 1;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-left: 16px;
+        }
+
+        /* 错误码 */
+        .error-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .error-item {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            text-align: center;
+        }
+        .error-code {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .error-msg {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* 卡片锚点滚动留白 */
+        .card {
+            scroll-margin-top: 80px;
+        }
+
+        /* 返回顶部 */
+        .back-top {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 44px;
+            height: 44px;
+            background: var(--primary);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+        }
+        .back-top.visible { opacity: 1; }
+
+        /* 响应式 - 平板及以下 */
+        @media (max-width: 900px) {
+            .menu-toggle { display: flex; }
+            .topbar { display: flex; }
+            .sidebar {
+                transform: translateX(-100%);
+                top: 0;
+                height: 100vh;
+            }
+            .sidebar.active { transform: translateX(0); }
+            .sidebar-content {
+                padding-top: 70px;
+                padding-bottom: 100px;
+            }
+            .mask.active { display: block; }
+            .main {
+                margin-left: 0;
+                padding: 72px 16px 24px;
+            }
+        }
+
+        /* 响应式 - 手机 */
+        @media (max-width: 480px) {
+            .main { padding: 72px 12px 20px; }
+            .card { padding: 16px; border-radius: 10px; }
+            .card-title { font-size: 18px; }
+            .card-title-sm { font-size: 15px; }
+            .api-path { font-size: 12px; padding: 6px 10px; }
+            .method { font-size: 11px; padding: 3px 6px; }
+            .param-table { font-size: 13px; }
+            .param-table th,
+            .param-table td { padding: 8px 10px; }
+            .code { padding: 12px; font-size: 12px; }
+            .error-grid { grid-template-columns: repeat(3, 1fr); }
+            .error-item { padding: 10px; }
+            .error-code { font-size: 18px; }
+            .back-top {
+                bottom: 16px;
+                right: 16px;
+                width: 40px;
+                height: 40px;
+            }
+            .auth-row { flex-wrap: wrap; gap: 8px; }
+            .auth-name { width: auto; }
+            .auth-desc { margin-left: 0; flex: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="topbar">
+        <button class="menu-toggle" id="menuToggle">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <span class="topbar-title">API 文档</span>
+    </div>
+
+    <!-- 遮罩层 -->
+    <div class="mask" id="mask"></div>
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-title">HYC下载站 API v2.2</div>
+        <div class="sidebar-content">
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">快速开始</div>
+                <a class="nav-link" href="#quickstart">快速开始</a>
+                <a class="nav-link" href="#auth">认证方式</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">文件管理</div>
+                <a class="nav-link" href="#files">文件管理</a>
+                <a class="nav-link sub" href="#list">列出文件</a>
+                <a class="nav-link sub" href="#fileinfo">获取信息</a>
+                <a class="nav-link sub" href="#preview">文件预览</a>
+                <a class="nav-link sub" href="#delete">删除文件</a>
+                <a class="nav-link sub" href="#mkdir">创建目录</a>
+                <a class="nav-link sub" href="#upload">上传文件</a>
+                <a class="nav-link sub" href="#batch">批量操作</a>
+                <a class="nav-link sub" href="#archive">压缩/解压</a>
+                <a class="nav-link sub" href="#search">搜索文件</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">镜像同步</div>
+                <a class="nav-link" href="#sync">同步管理</a>
+                <a class="nav-link sub" href="#sync-sources">同步源</a>
+                <a class="nav-link sub" href="#sync-status">同步状态</a>
+                <a class="nav-link sub" href="#sync-control">控制同步</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">加速源</div>
+                <a class="nav-link" href="#mirror">镜像站</a>
+                <a class="nav-link sub" href="#mirror-list">镜像列表</a>
+                <a class="nav-link sub" href="#mirror-ops">镜像操作</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Minecraft</div>
+                <a class="nav-link" href="#mc">MC 服务</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">缓存监控</div>
+                <a class="nav-link" href="#cache">缓存管理</a>
+                <a class="nav-link" href="#monitor">监控统计</a>
+                <a class="nav-link sub" href="#monitor-realtime">实时监控</a>
+                <a class="nav-link" href="#health">健康检查</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">V2 API</div>
+                <a class="nav-link" href="#v2-mirrors">加速源</a>
+                <a class="nav-link" href="#v2-monitor">监控</a>
+                <a class="nav-link" href="#v2-health">健康检查</a>
+                <a class="nav-link" href="#v2-alerts">告警管理</a>
+                <a class="nav-link" href="#v2-webhooks">Webhooks</a>
+                <a class="nav-link" href="#v2-server">服务器管理</a>
+                <a class="nav-link" href="#v2-config">配置管理</a>
+                <a class="nav-link" href="#v2-stats">增强统计</a>
+                <a class="nav-link" href="#v2-search">增强搜索</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">管理</div>
+                <a class="nav-link" href="#admin">认证管理</a>
+                <a class="nav-link sub" href="#keys">API 密钥</a>
+                <a class="nav-link sub" href="#sessions">会话</a>
+                <a class="nav-link sub" href="#webhooks">Webhooks</a>
+                <a class="nav-link" href="#ws">WebSocket</a>
+                <a class="nav-link" href="#sse">SSE</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">参考</div>
+                <a class="nav-link" href="#errors">错误码</a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main" id="mainContent">
+        <!-- 快速开始 -->
+        <div class="card" id="quickstart">
+            <h2 class="card-title">快速开始</h2>
+            <div class="code">
+<span class="c"># 设置 API Key</span>
+export API_KEY=<span class="s">"your-api-key"</span>
+
+<span class="c"># 健康检查</span>
+curl http://localhost:8080/api/v1/health
+
+<span class="c"># 获取文件列表</span>
+curl http://localhost:8080/api/v1/files
+
+<span class="c"># 认证请求</span>
+curl -H <span class="s">"X-API-Key: $API_KEY"</span> http://localhost:8080/api/v2/admin/stats
+            </div>
+        </div>
+
+        <!-- 认证方式 -->
+        <div class="card" id="auth">
+            <h2 class="card-title">认证方式</h2>
+            <div class="auth-row">
+                <span class="auth-name">API Key</span>
+                <span class="auth-value">X-API-Key: xxx</span>
+                <span class="auth-desc">推荐方式</span>
+            </div>
+            <div class="auth-row">
+                <span class="auth-name">Bearer</span>
+                <span class="auth-value">Authorization: Bearer token</span>
+                <span class="auth-desc">JWT Token</span>
+            </div>
+            <div class="auth-row">
+                <span class="auth-name">Cookie</span>
+                <span class="auth-value">hyc_auth=session</span>
+                <span class="auth-desc">Session</span>
+            </div>
+            <div class="auth-row">
+                <span class="auth-name">Query</span>
+                <span class="auth-value">?key=xxx</span>
+                <span class="auth-desc">URL 参数</span>
+            </div>
+        </div>
+
+        <!-- 文件管理 -->
+        <div class="card" id="files">
+            <h2 class="card-title">文件管理</h2>
+
+            <h3 class="card-title-sm" id="list">列出文件</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/files</span></div>
+            <table class="param-table">
+                <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+                <tr><td><span class="param-name">path</span></td><td><span class="param-type">string</span></td><td>目录路径</td></tr>
+                <tr><td><span class="param-name">recursive</span></td><td><span class="param-type">bool</span></td><td>递归列出</td></tr>
+            </table>
+            <div class="code">
+{<span class="v">"files"</span>: [{<span class="v">"name"</span>: <span class="s">"ubuntu.iso"</span>, <span class="v">"size"</span>: <span class="n">4588563456</span>}], <span class="v">"page"</span>: <span class="n">1</span>}
+            </div>
+
+            <h3 class="card-title-sm" id="fileinfo">获取文件信息</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/file/{path}</span></div>
+
+            <h3 class="card-title-sm" id="preview">文件预览</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/file/{path}/preview</span></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">支持文本、图片、JSON 预览，最大 10MB</p>
+            <div class="code">
+{<span class="v">"path"</span>: <span class="s">"readme.txt"</span>, <span class="v">"preview_available"</span>: <span class="k">true</span>, <span class="v">"preview_type"</span>: <span class="s">"text"</span>, <span class="v">"content"</span>: <span class="s">"..."</span>}
+            </div>
+
+            <h3 class="card-title-sm" id="delete">删除文件</h3>
+            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v1/file/{path}</span></div>
+
+            <h3 class="card-title-sm" id="mkdir">创建目录</h3>
+            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v1/mkdir</span></div>
+            <div class="code">{<span class="v">"path"</span>: <span class="s">"/downloads/new"</span>}</div>
+
+            <h3 class="card-title-sm" id="upload">上传文件</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v1/upload</span></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">multipart/form-data 表单，参数: path(目标目录), file(文件)</p>
+
+            <h3 class="card-title-sm" id="batch">批量操作</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v1/batch</span></div>
+            <div class="code">{<span class="v">"operation"</span>: <span class="s">"delete"</span>, <span class="v">"files"</span>: [<span class="s">"f1.iso"</span>, <span class="s">"f2.iso"</span>], <span class="v">"target_dir"</span>: <span class="s">""</span>}</div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">operation: delete, move, copy</p>
+
+            <h3 class="card-title-sm" id="archive">压缩/解压</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v1/archive</span></div>
+            <div class="code">{<span class="v">"operation"</span>: <span class="s">"compress"</span>, <span class="v">"files"</span>: [<span class="s">"file1"</span>, <span class="s">"file2"</span>], <span class="v">"archive_name"</span>: <span class="s">"archive.zip"</span>}</div>
+            <div class="code">{<span class="v">"operation"</span>: <span class="s">"extract"</span>, <span class="v">"files"</span>: [<span class="s">"archive.zip"</span>], <span class="v">"target_dir"</span>: <span class="s">"extracted/"</span>}</div>
+
+            <h3 class="card-title-sm" id="search">搜索文件</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/search?q=关键词</span></div>
+            <table class="param-table">
+                <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+                <tr><td><span class="param-name">q</span></td><td><span class="param-type">string</span></td><td>搜索关键词</td></tr>
+                <tr><td><span class="param-name">type</span></td><td><span class="param-type">string</span></td><td>all, file, dir</td></tr>
+                <tr><td><span class="param-name">limit</span></td><td><span class="param-type">int</span></td><td>结果数量限制</td></tr>
+            </table>
+        </div>
+
+        <!-- 镜像同步 -->
+        <div class="card" id="sync">
+            <h2 class="card-title">镜像同步</h2>
+
+            <h3 class="card-title-sm" id="sync-sources">同步源管理</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/sync/sources</span></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">获取同步源列表</p>
+
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v1/sync/sources</span></div>
+            <div class="code">{<span class="v">"name"</span>: <span class="s">"ubuntu"</span>, <span class="v">"config"</span>: {<span class="v">"url"</span>: <span class="s">"https://..."</span>, <span class="v">"target"</span>: <span class="s">"ubuntu/"</span>}}</div>
+
+            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v1/sync/sources/{name}</span></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">删除同步源</p>
+
+            <h3 class="card-title-sm" id="sync-status">同步状态</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/sync/status</span></div>
+            <div class="code">
+{<span class="v">"running"</span>: <span class="k">true</span>, <span class="v">"progress"</span>: <span class="n">45.5</span>, <span class="v">"synced"</span>: <span class="n">1250</span>, <span class="v">"total"</span>: <span class="n">2748</span>, <span class="v">"speed"</span>: <span class="s">"2.5 MB/s"</span>}
+            </div>
+
+            <h3 class="card-title-sm" id="sync-control">控制同步</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v1/sync/start</span></div>
+            <div class="code">{<span class="v">"name"</span>: <span class="s">"ubuntu"</span>}</div>
+
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v1/sync/stop</span></div>
+            <div class="code">{<span class="v">"name"</span>: <span class="s">"ubuntu"</span>}</div>
+        </div>
+
+        <!-- 加速源 -->
+        <div class="card" id="mirror">
+            <h2 class="card-title">加速源 (Mirror)</h2>
+
+            <h3 class="card-title-sm" id="mirror-list">镜像列表</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mirror/list</span></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">type: docker, apt, yum, pypi, npm, go</p>
+
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mirror/{type}/list</span></div>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mirror/{type}/search?q=关键词</span></div>
+
+            <h3 class="card-title-sm" id="mirror-ops">镜像操作</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mirror/info</span></div>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mirror/status</span></div>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mirror/speed</span></div>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mirror/bandwidth</span></div>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v1/mirror/refresh</span></div>
+            <div class="code">
+{<span class="v">"speed"</span>: {<span class="v">"upload"</span>: <span class="n">1024</span>, <span class="v">"download"</span>: <span class="n">2048</span>, <span class="v">"unit"</span>: <span class="s">"KB/s"</span>}}
+            </div>
+        </div>
+
+        <!-- Minecraft -->
+        <div class="card" id="mc">
+            <h2 class="card-title">Minecraft 服务</h2>
+
+            <h3 class="card-title-sm">核心列表</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mc/corelist</span></div>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mc/corelist/{name}</span></div>
+            <div class="code">
+{<span class="v">"corelist"</span>: [{<span class="v">"project"</span>: <span class="s">"Paper"</span>, <span class="v">"versions"</span>: [<span class="s">"1.21.1"</span>, <span class="s">"1.20.4"</span>]}]}
+            </div>
+
+            <h3 class="card-title-sm">版本列表</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mc/versions</span></div>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mc/versions/{name}</span></div>
+
+            <h3 class="card-title-sm">下载核心</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mc/download/{name}/{version}</span></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">下载指定版本的核心文件 (重定向到下载链接)</p>
+
+            <h3 class="card-title-sm">核心信息</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/mc/info/{name}/{version}</span></div>
+            <div class="code">
+{<span class="v">"core_name"</span>: <span class="s">"Paper"</span>, <span class="v">"version"</span>: <span class="s">"1.21.1"</span>, <span class="v">"size"</span>: <span class="n">52428800</span>, <span class="v">"sha256"</span>: <span class="s">"abc123..."</span>}
+            </div>
+        </div>
+
+        <!-- 缓存管理 -->
+        <div class="card" id="cache">
+            <h2 class="card-title">缓存管理</h2>
+
+            <h3 class="card-title-sm">缓存统计</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/cache/stats</span></div>
+            <div class="code">
+{<span class="v">"size"</span>: <span class="n">10737418240</span>, <span class="v">"count"</span>: <span class="n">1520</span>, <span class="v">"hit_rate"</span>: <span class="n">85.5</span>}
+            </div>
+
+            <h3 class="card-title-sm">缓存统计 V2</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/cache/stats</span></div>
+            <div class="code">
+{<span class="v">"size"</span>: <span class="n">10737418240</span>, <span class="v">"count"</span>: <span class="n">1520</span>, <span class="v">"hit_rate"</span>: <span class="n">85.5</span>, <span class="v">"miss_count"</span>: <span class="n">256</span>, <span class="v">"last_clean"</span>: <span class="s">"2024-01-15T10:30:00"</span>}
+            </div>
+
+            <h3 class="card-title-sm">缓存使用详情</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/cache/usage</span></div>
+            <div class="code">
+{<span class="v">"entries"</span>: [{<span class="v">"key"</span>: <span class="s">"docker/ubuntu:latest"</span>, <span class="v">"size"</span>: <span class="n">52428800</span>, <span class="v">"access_count"</span>: <span class="n">1250</span>, <span class="v">"last_access"</span>: <span class="s">"2024-01-15T10:30:00"</span>}], <span class="v">"page"</span>: <span class="n">1</span>, <span class="v">"total"</span>: <span class="n">1520</span>}
+            </div>
+
+            <h3 class="card-title-sm">清理缓存</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v1/cache/clean</span></div>
+
+            <h3 class="card-title-sm">清空缓存</h3>
+            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v1/cache</span></div>
+        </div>
+
+        <!-- V2增强API - 加速源 -->
+        <div class="card" id="v2-mirrors">
+            <h2 class="card-title">V2 加速源 API</h2>
+
+            <h3 class="card-title-sm">获取镜像列表</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/mirrors</span></div>
+            <div class="code">
+{<span class="v">"mirrors"</span>: {<span class="v">"docker"</span>: {<span class="v">"enabled"</span>: <span class="k">true</span>, <span class="v">"count"</span>: <span class="n">156</span>}, <span class="v">"apt"</span>: {<span class="v">"enabled"</span>: <span class="k">true</span>, <span class="v">"count"</span>: <span class="n">45820</span>}, <span class="v">"custom-mirror"</span>: {<span class="v">"enabled"</span>: <span class="k">true</span>, <span class="v">"type"</span>: <span class="s">"custom"</span>, <span class="v">"url"</span>: <span class="s">"https://mirror.example.com"</span>}}}
+            </div>
+
+            <h3 class="card-title-sm">添加镜像</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/mirrors</span></div>
+            <div class="code">
+{<span class="v">"name"</span>: <span class="s">"custom-mirror"</span>, <span class="v">"type"</span>: <span class="s">"custom"</span>, <span class="v">"url"</span>: <span class="s">"https://mirror.example.com"</span>, <span class="v">"description"</span>: <span class="s">"自定义镜像"</span>, <span class="v">"enabled"</span>: <span class="k">true</span>, <span class="v">"cache_enabled"</span>: <span class="k">true</span>, <span class="v">"cache_ttl"</span>: <span class="n">86400</span>}
+            </div>
+
+            <h3 class="card-title-sm">更新镜像</h3>
+            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/mirrors/{name}</span></div>
+
+            <h3 class="card-title-sm">删除镜像</h3>
+            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v2/mirrors/{name}</span></div>
+
+            <h3 class="card-title-sm">启用/禁用镜像</h3>
+            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/mirrors/{name}/enable?enabled=true</span></div>
+
+            <h3 class="card-title-sm">刷新镜像</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/mirrors/{name}/refresh</span></div>
+        </div>
+
+        <!-- V2增强API - 监控 -->
+        <div class="card" id="v2-monitor">
+            <h2 class="card-title">V2 监控 API</h2>
+
+            <h3 class="card-title-sm">实时监控</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/monitor/realtime</span></div>
+            <div class="code">
+{<span class="v">"cpu"</span>: {<span class="v">"percent"</span>: <span class="n">35.5</span>, <span class="v">"count"</span>: <span class="n">8</span>, <span class="v">"model"</span>: <span class="s">"Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz"</span>}, <span class="v">"memory"</span>: {<span class="v">"percent"</span>: <span class="n">37.5</span>, <span class="v">"total"</span>: <span class="n">17179869184</span>, <span class="v">"used"</span>: <span class="n">6442450944</span>}, <span class="v">"disk"</span>: {<span class="v">"percent"</span>: <span class="n">20.0</span>, <span class="v">"total"</span>: <span class="n">536870912000</span>, <span class="v">"used"</span>: <span class="n">53687091200</span>}, <span class="v">"network"</span>: {<span class="v">"upload"</span>: <span class="n">1024</span>, <span class="v">"download"</span>: <span class="n">2048</span>}}
+            </div>
+
+            <h3 class="card-title-sm">历史数据</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/monitor/history?metric=cpu&start=2024-01-01&end=2024-01-15</span></div>
+            <div class="code">
+{<span class="v">"metric"</span>: <span class="s">"cpu"</span>, <span class="v">"data"</span>: [{<span class="v">"timestamp"</span>: <span class="s">"2024-01-15T10:00:00"</span>, <span class="v">"value"</span>: <span class="n">35.5</span>}, {<span class="v">"timestamp"</span>: <span class="s">"2024-01-15T10:05:00"</span>, <span class="v">"value"</span>: <span class="n">38.2</span>}], <span class="v">"avg"</span>: <span class="n">36.8</span>, <span class="v">"max"</span>: <span class="n">45.2</span>, <span class="v">"min"</span>: <span class="n">28.5</span>}
+            </div>
+        </div>
+
+        <!-- V2增强API - 健康检查 -->
+        <div class="card" id="v2-health">
+            <h2 class="card-title">V2 健康检查 API</h2>
+
+            <h3 class="card-title-sm">健康状态</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/health</span></div>
+            <div class="code">
+{<span class="v">"status"</span>: <span class="s">"healthy"</span>, <span class="v">"timestamp"</span>: <span class="s">"2024-01-15T10:30:00"</span>, <span class="v">"version"</span>: <span class="s">"2.2.0"</span>, <span class="v">"uptime"</span>: <span class="n">86400</span>, <span class="v">"system"</span>: {<span class="v">"cpu_percent"</span>: <span class="n">35.5</span>, <span class="v">"memory_percent"</span>: <span class="n">37.5</span>, <span class="v">"disk_percent"</span>: <span class="n">20.0</span>}}
+            </div>
+
+            <h3 class="card-title-sm">镜像源健康</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/health/sources</span></div>
+            <div class="code">
+{<span class="v">"sources"</span>: [{<span class="v">"name"</span>: <span class="s">"docker"</span>, <span class="v">"status"</span>: <span class="s">"healthy"</span>, <span class="v">"latency_ms"</span>: <span class="n">125</span>, <span class="v">"last_check"</span>: <span class="s">"2024-01-15T10:30:00"</span>}, {<span class="v">"name"</span>: <span class="s">"apt"</span>, <span class="v">"status"</span>: <span class="s">"healthy"</span>, <span class="v">"latency_ms"</span>: <span class="n">89</span>}], <span class="v">"overall"</span>: <span class="s">"healthy"</span>}
+            </div>
+
+            <h3 class="card-title-sm">故障切换状态</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/health/failover</span></div>
+            <div class="code">
+{<span class="v">"enabled"</span>: <span class="k">true</span>, <span class="v">"active"</span>: <span class="k">false</span>, <span class="v">"failover_count"</span>: <span class="n">0</span>, <span class="v">"last_failover"</span>: <span class="k">null</span>}
+            </div>
+        </div>
+
+        <!-- V2增强API - 告警管理 -->
+        <div class="card" id="v2-alerts">
+            <h2 class="card-title">V2 告警管理 API</h2>
+
+            <h3 class="card-title-sm">获取告警</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/alerts</span></div>
+            <div class="code">
+{<span class="v">"alerts"</span>: [{<span class="v">"id"</span>: <span class="s">"alert-001"</span>, <span class="v">"type"</span>: <span class="s">"disk"</span>, <span class="v">"severity"</span>: <span class="s">"warning"</span>, <span class="v">"message"</span>: <span class="s">"Disk usage above 80%"</span>, <span class="v">"timestamp"</span>: <span class="s">"2024-01-15T10:30:00"</span>, <span class="v">"acknowledged"</span>: <span class="k">false</span>}], <span class="v">"total"</span>: <span class="n">1</span>}
+            </div>
+
+            <h3 class="card-title-sm">确认告警</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/alerts/{id}/acknowledge</span></div>
+
+            <h3 class="card-title-sm">告警配置</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/alerts/config</span></div>
+            <div class="code">
+{<span class="v">"enabled"</span>: <span class="k">true</span>, <span class="v">"disk_warning"</span>: <span class="n">80</span>, <span class="v">"disk_critical"</span>: <span class="n">90</span>, <span class="v">"email_enabled"</span>: <span class="k">true</span>, <span class="v">"smtp_server"</span>: <span class="s">"smtp.example.com"</span>, <span class="v">"alert_email"</span>: <span class="s">"admin@example.com"</span>}
+            </div>
+
+            <h3 class="card-title-sm">更新告警配置</h3>
+            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/alerts/config</span></div>
+        </div>
+
+        <!-- V2增强API - Webhooks -->
+        <div class="card" id="v2-webhooks">
+            <h2 class="card-title">V2 Webhooks API</h2>
+
+            <h3 class="card-title-sm">列出 Webhooks</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/webhooks</span> (admin)</div>
+            <div class="code">
+{<span class="v">"webhooks"</span>: [{<span class="v">"id"</span>: <span class="s">"wh-001"</span>, <span class="v">"name"</span>: <span class="s">"Download Notify"</span>, <span class="v">"url"</span>: <span class="s">"https://example.com/webhook"</span>, <span class="v">"events"</span>: [<span class="s">"download"</span>, <span class="s">"upload"</span>], <span class="v">"enabled"</span>: <span class="k">true</span>}], <span class="v">"total"</span>: <span class="n">1</span>}
+            </div>
+
+            <h3 class="card-title-sm">创建 Webhook</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/webhooks</span> (admin)</div>
+            <div class="code">
+{<span class="v">"name"</span>: <span class="s">"Download Notify"</span>, <span class="v">"url"</span>: <span class="s">"https://example.com/webhook"</span>, <span class="v">"events"</span>: [<span class="s">"download"</span>, <span class="s">"sync_complete"</span>], <span class="v">"headers"</span>: {<span class="v">"Authorization"</span>: <span class="s">"Bearer token"</span>}, <span class="v">"enabled"</span>: <span class="k">true</span>}
+            </div>
+
+            <h3 class="card-title-sm">获取 Webhook</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/webhooks/{id}</span> (admin)</div>
+
+            <h3 class="card-title-sm">更新 Webhook</h3>
+            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/webhooks/{id}</span> (admin)</div>
+
+            <h3 class="card-title-sm">删除 Webhook</h3>
+            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v2/webhooks/{id}</span> (admin)</div>
+
+            <h3 class="card-title-sm">测试 Webhook</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/webhooks/{id}/test</span> (admin)</div>
+            <div class="code">
+{<span class="v">"success"</span>: <span class="k">true</span>, <span class="v">"status_code"</span>: <span class="n">200</span>, <span class="v">"response_time_ms"</span>: <span class="n">150</span>, <span class="v">"response_body"</span>: <span class="s">"OK"</span>}
+            </div>
+        </div>
+
+        <!-- V2增强API - 服务器管理 -->
+        <div class="card" id="v2-server">
+            <h2 class="card-title">V2 服务器管理 API</h2>
+
+            <h3 class="card-title-sm">服务器信息</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/server/info</span></div>
+            <div class="code">
+{<span class="v">"version"</span>: <span class="s">"2.2.0"</span>, <span class="v">"uptime"</span>: <span class="n">86400</span>, <span class="v">"platform"</span>: <span class="s">"Linux x86_64"</span>, <span class="v">"python_version"</span>: <span class="s">"3.10.12"</span>, <span class="v">"pid"</span>: <span class="n">1234</span>, <span class="v">"config_path"</span>: <span class="s">"/etc/hyc/settings.json"</span>}
+            </div>
+
+            <h3 class="card-title-sm">重启服务器</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/server/restart</span></div>
+            <div class="code">
+{<span class="v">"message"</span>: <span class="s">"Server restart initiated"</span>, <span class="v">"delay_seconds"</span>: <span class="n">5</span>}
+            </div>
+
+            <h3 class="card-title-sm">关闭服务器</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/server/shutdown</span></div>
+
+            <h3 class="card-title-sm">服务器日志</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/server/logs?lines=100</span></div>
+            <div class="code">
+{<span class="v">"logs"</span>: [<span class="s">"2024-01-15 10:30:00 INFO: Server started"</span>, <span class="s">"2024-01-15 10:30:01 INFO: Health check passed"</span>], <span class="v">"total_lines"</span>: <span class="n">100</span>}
+            </div>
+        </div>
+
+        <!-- V2增强API - 配置管理 -->
+        <div class="card" id="v2-config">
+            <h2 class="card-title">V2 配置管理 API</h2>
+
+            <h3 class="card-title-sm">获取配置</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/config</span></div>
+
+            <h3 class="card-title-sm">获取配置 V2</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/config</span></div>
+            <div class="code">
+{<span class="v">"success"</span>: <span class="k">true</span>, <span class="v">"config"</span>: <span class="s">"{\"port\": 8080, \"base_dir\": \"./downloads\"...}</span>, <span class="v">"path"</span>: <span class="s">"/etc/hyc/settings.json"</span>}
+            </div>
+
+            <h3 class="card-title-sm">保存配置</h3>
+            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/config</span></div>
+            <div class="code">
+{<span class="v">"success"</span>: <span class="k">true</span>, <span class="v">"message"</span>: <span class="s">"Configuration saved"</span>}
+            </div>
+
+            <h3 class="card-title-sm">重新加载配置</h3>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/config/reload</span></div>
+        </div>
+
+        <!-- V2增强API - 增强统计 -->
+        <div class="card" id="v2-stats">
+            <h2 class="card-title">V2 增强统计 API</h2>
+
+            <h3 class="card-title-sm">基础统计</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/stats</span></div>
+            <div class="code">
+{<span class="v">"total_files"</span>: <span class="n">1520</span>, <span class="v">"total_size"</span>: <span class="n">107374182400</span>, <span class="v">"total_downloads"</span>: <span class="n">52340</span>, <span class="v">"downloads_today"</span>: <span class="n">1250</span>, <span class="v">"downloads_week"</span>: <span class="n">8920</span>}
+            </div>
+
+            <h3 class="card-title-sm">详细统计</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/stats/detailed</span></div>
+            <div class="code">
+{<span class="v">"total_files"</span>: <span class="n">1520</span>, <span class="v">"total_size"</span>: <span class="n">107374182400</span>, <span class="v">"file_types"</span>: {<span class="v">"application/octet-stream"</span>: <span class="n">850</span>, <span class="v">"text/plain"</span>: <span class="n">320</span>, <span class="v">"application/json"</span>: <span class="n">150</span>}, <span class="v">"top_downloads"</span>: [{<span class="v">"file"</span>: <span class="s">"ubuntu-22.04.iso"</span>, <span class="v">"count"</span>: <span class="n">5234</span>}], <span class="v">"daily_stats"</span>: [{<span class="v">"date"</span>: <span class="s">"2024-01-15"</span>, <span class="v">"downloads"</span>: <span class="n">1250</span>, <span class="v">"size"</span>: <span class="n">5368709120</span>}]}
+            </div>
+        </div>
+
+        <!-- V2增强API - 增强搜索 -->
+        <div class="card" id="v2-search">
+            <h2 class="card-title">V2 增强搜索 API</h2>
+
+            <h3 class="card-title-sm">增强搜索</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/search/enhanced?q=关键词</span></div>
+            <div class="code">
+{<span class="v">"results"</span>: [{<span class="v">"path"</span>: <span class="s">"/downloads/ubuntu-22.04.iso"</span>, <span class="v">"name"</span>: <span class="s">"ubuntu-22.04.iso"</span>, <span class="v">"size"</span>: <span class="n">4588563456</span>, <span class="v">"type"</span>: <span class="s">"file"</span>, <span class="v">"score"</span>: <span class="n">0.95</span>}], <span class="v">"total"</span>: <span class="n">1</span>, <span class="v">"took_ms"</span>: <span class="n">12</span>}
+            </div>
+
+            <h3 class="card-title-sm">按日期搜索</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/search/by-date?start=2024-01-01&end=2024-01-31</span></div>
+            <div class="code">
+{<span class="v">"results"</span>: [{<span class="v">"path"</span>: <span class="s">"/downloads/ubuntu-22.04.iso"</span>, <span class="v">"name"</span>: <span class="s">"ubuntu-22.04.iso"</span>, <span class="v">"modified"</span>: <span class="s">"2024-01-15T10:30:00"</span>}], <span class="v">"total"</span>: <span class="n">1</span>}
+            </div>
+
+            <h3 class="card-title-sm">按类型搜索</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/search/by-type?type=iso</span></div>
+        </div>
+
+        <!-- 监控统计 -->
+        <div class="card" id="monitor">
+            <h2 class="card-title">监控统计</h2>
+
+            <h3 class="card-title-sm">基础统计</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/stats</span></div>
+            <div class="code">
+{<span class="v">"total_files"</span>: <span class="n">1520</span>, <span class="v">"total_size"</span>: <span class="n">107374182400</span>, <span class="v">"total_downloads"</span>: <span class="n">52340</span>}
+            </div>
+
+            <h3 class="card-title-sm" id="monitor-realtime">实时监控</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/monitor/realtime</span></div>
+            <div class="code">
+{<span class="v">"cpu"</span>: {<span class="v">"percent"</span>: <span class="n">35.5</span>, <span class="v">"count"</span>: <span class="n">8</span>}, <span class="v">"memory"</span>: {<span class="v">"percent"</span>: <span class="n">37.5</span>, <span class="v">"total"</span>: <span class="n">17179869184</span>}, <span class="v">"disk"</span>: {<span class="v">"percent"</span>: <span class="n">20.0</span>, <span class="v">"used"</span>: <span class="n">53687091200</span>}}
+            </div>
+        </div>
+
+        <!-- 健康检查 -->
+        <div class="card" id="health">
+            <h2 class="card-title">健康检查</h2>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v1/health</span></div>
+            <div class="code">
+{<span class="v">"status"</span>: <span class="s">"healthy"</span>, <span class="v">"timestamp"</span>: <span class="s">"2024-01-15T10:30:00"</span>, <span class="v">"version"</span>: <span class="s">"2.2.0"</span>, <span class="v">"uptime"</span>: <span class="n">86400</span>, <span class="v">"system"</span>: {<span class="v">"cpu_percent"</span>: <span class="n">35.5</span>, <span class="v">"memory_percent"</span>: <span class="n">37.5</span>}}
+            </div>
+        </div>
+
+        <!-- 认证管理 -->
+        <div class="card" id="admin">
+            <h2 class="card-title">认证管理</h2>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/admin/auth/verify</span></div>
+            <div class="code">{<span class="v">"valid"</span>: <span class="k">true</span>, <span class="v">"level"</span>: <span class="s">"admin"</span>, <span class="v">"permissions"</span>: [...]}</div>
+
+            <h3 class="card-title-sm" id="keys">API 密钥</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/admin/keys</span> (admin)</div>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/admin/keys</span> (admin)</div>
+            <div class="code">{<span class="v">"name"</span>: <span class="s">"New Key"</span>, <span class="v">"level"</span>: <span class="s">"user"</span>, <span class="v">"permissions"</span>: [<span class="s">"files:read"</span>]}</div>
+
+            <h3 class="card-title-sm">密钥状态</h3>
+            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/admin/keys/{id}/disable</span> (admin)</div>
+            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/admin/keys/{id}/enable</span> (admin)</div>
+
+            <h3 class="card-title-sm">删除密钥</h3>
+            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v2/admin/keys/{id}</span> (admin)</div>
+
+            <h3 class="card-title-sm" id="sessions">会话管理</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/admin/sessions</span> (admin)</div>
+            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v2/admin/sessions/{id}</span> (admin)</div>
+
+            <h3 class="card-title-sm">认证统计</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/admin/stats</span> (admin)</div>
+            <div class="code">
+{<span class="v">"total_keys"</span>: <span class="n">15</span>, <span class="v">"enabled_keys"</span>: <span class="n">12</span>, <span class="v">"active_sessions"</span>: <span class="n">5</span>}
+            </div>
+        </div>
+
+        <!-- Webhooks -->
+        <div class="card" id="webhooks">
+            <h2 class="card-title">Webhooks</h2>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/webhooks</span> (admin)</div>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/webhooks</span> (admin)</div>
+            <div class="code">{<span class="v">"name"</span>: <span class="s">"Download Notify"</span>, <span class="v">"url"</span>: <span class="s">"https://..."</span>, <span class="v">"events"</span>: [<span class="s">"download"</span>]}</div>
+
+            <h3 class="card-title-sm">Webhook 操作</h3>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/webhooks/{id}</span> (admin)</div>
+            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v2/webhooks/{id}</span> (admin)</div>
+            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/webhooks/{id}/test</span> (admin)</div>
+            <div class="code">{<span class="v">"success"</span>: <span class="k">true</span>, <span class="v">"status_code"</span>: <span class="n">200</span>, <span class="v">"response_time"</span>: <span class="n">150</span>}</div>
+        </div>
+
+        <!-- WebSocket -->
+        <div class="card" id="ws">
+            <h2 class="card-title">WebSocket</h2>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/ws</span></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">建立 WebSocket 连接接收实时更新</p>
+            <div class="code">
+<span class="c"># 连接示例</span>
+<span class="v">wss://</span><span class="s">your-server</span><span class="v">/ws</span>
+
+<span class="c"># 接收消息</span>
+{<span class="v">"type"</span>: <span class="s">"download"</span>, <span class="v">"file"</span>: <span class="s">"ubuntu.iso"</span>, <span class="v">"size"</span>: <span class="n">4588563456</span>}
+            </div>
+        </div>
+
+        <!-- SSE -->
+        <div class="card" id="sse">
+            <h2 class="card-title">SSE 事件流</h2>
+            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/sse/stream</span></div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">订阅 Server-Sent Events 实时更新</p>
+            <div class="code">
+<span class="c"># 请求头</span>
+Accept: <span class="s">text/event-stream</span>
+
+<span class="c"># 接收消息</span>
+<span class="k">event</span>: download
+<span class="k">data</span>: {<span class="v">"file"</span>: <span class="s">"ubuntu.iso"</span>, <span class="v">"size"</span>: <span class="n">4588563456</span>}
+            </div>
+        </div>
+
+        <!-- 错误码 -->
+        <div class="card" id="errors">
+            <h2 class="card-title">错误码</h2>
+            <div class="error-grid">
+                <div class="error-item"><div class="error-code">200</div><div class="error-msg">成功</div></div>
+                <div class="error-item"><div class="error-code">201</div><div class="error-msg">已创建</div></div>
+                <div class="error-item"><div class="error-code">400</div><div class="error-msg">请求错误</div></div>
+                <div class="error-item"><div class="error-code">401</div><div class="error-msg">未认证</div></div>
+                <div class="error-item"><div class="error-code">403</div><div class="error-msg">无权限</div></div>
+                <div class="error-item"><div class="error-code">404</div><div class="error-msg">不存在</div></div>
+                <div class="error-item"><div class="error-code">405</div><div class="error-msg">方法不允许</div></div>
+                <div class="error-item"><div class="error-code">413</div><div class="error-msg">文件过大</div></div>
+                <div class="error-item"><div class="error-code">500</div><div class="error-msg">服务器错误</div></div>
+                <div class="error-item"><div class="error-code">503</div><div class="error-msg">服务不可用</div></div>
+            </div>
+        </div>
+
+        <p style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px 0;">
+            HYC下载站 API v2.2.0 · 最后更新 2024-01-15
+        </p>
+    </main>
+
+    <!-- 返回顶部 -->
+    <button class="back-top" id="backTop" title="返回顶部">↑</button>
+
+    <script>
+        (function() {
+            var menuToggle = document.getElementById('menuToggle');
+            var sidebar = document.getElementById('sidebar');
+            var mask = document.getElementById('mask');
+            var backTop = document.getElementById('backTop');
+            var navLinks = document.querySelectorAll('.nav-link');
+            var sections = {};
+
+            // 收集所有 section
+            document.querySelectorAll('.card').forEach(function(card) {
+                sections['#' + card.id] = card;
+            });
+
+            // 打开/关闭侧边栏
+            function toggleMenu() {
+                var isOpen = sidebar.classList.contains('active');
+                sidebar.classList.toggle('active');
+                menuToggle.classList.toggle('active');
+                mask.classList.toggle('active');
+                document.body.style.overflow = isOpen ? '' : 'hidden';
+            }
+
+            menuToggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggleMenu();
+            });
+
+            mask.addEventListener('click', function() {
+                sidebar.classList.remove('active');
+                menuToggle.classList.remove('active');
+                mask.classList.remove('active');
+                document.body.style.overflow = '';
+            });
+
+            // 点击导航链接 - 滚动到中间
+            navLinks.forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var href = link.getAttribute('href');
+                    var target = sections[href];
+                    if (target) {
+                        // 计算居中位置
+                        var rect = target.getBoundingClientRect();
+                        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                        var targetScroll = rect.top + scrollTop - window.innerHeight / 2 + rect.height / 2 - 60;
+                        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+                    }
+                    // 移动端点击后关闭侧边栏
+                    if (window.innerWidth <= 900) {
+                        sidebar.classList.remove('active');
+                        menuToggle.classList.remove('active');
+                        mask.classList.remove('active');
+                        document.body.style.overflow = '';
+                    }
+                });
+            });
+
+            // 返回顶部按钮
+            backTop.addEventListener('click', function() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+
+            // 返回顶部按钮显示/隐藏
+            window.addEventListener('scroll', function() {
+                var scrollY = window.scrollY || window.pageYOffset;
+                backTop.classList.toggle('visible', scrollY > 200);
+            });
+        })();
+    </script>
+</body>
+</html>
