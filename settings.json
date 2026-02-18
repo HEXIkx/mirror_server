@@ -1,0 +1,602 @@
+{
+  "server_name": "HYC下载站",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "base_dir": "/home/hycexit/project/vs1/downloads",
+  "api_version": "v2",
+  "directory_listing": true,
+  "enable_stats": true,
+  "show_hash": true,
+  "ignore_hidden": true,
+  "max_upload_size": 1073741824,
+  "timeout": 30,
+  "enable_range": true,
+  "max_workers": 10,
+  "auth_type": "token",
+  "auth_user": "admin",
+  "auth_pass": "admin123",
+  "auth_token": "demo_token_123456",
+  "auth_session_timeout": 3600,
+  "auth_cookie_max_age": 86400,
+  "ip_whitelist_enabled": false,
+  "ip_whitelist": [],
+  "ip_blacklist": [],
+  "enable_ws": true,
+  "enable_sse": true,
+  "enable_monitor": true,
+  "monitor_interval": 3,
+  "enable_sync": true,
+  "sync_config": null,
+  "sync_sources": {},
+  "enable_mirrors": true,
+  "database": {
+    "enabled": true,
+    "type": "sqlite",
+    "sync_interval": 60,
+    "sqlite": {
+      "path": "./data/hyc.db"
+    },
+    "postgresql": {
+      "enabled": false,
+      "host": "localhost",
+      "port": 5432,
+      "database": "hyc",
+      "table_prefix": "hyc_",
+      "user": "postgres",
+      "password": "",
+      "pool_size": 5,
+      "max_overflow": 10,
+      "ssl_mode": "prefer",
+      "connection_timeout": 30
+    },
+    "mysql": {
+      "enabled": false,
+      "host": "localhost",
+      "port": 3306,
+      "database": "hyc",
+      "table_prefix": "hyc_",
+      "user": "root",
+      "password": "",
+      "pool_size": 5,
+      "max_overflow": 10,
+      "charset": "utf8mb4",
+      "connection_timeout": 30
+    },
+    "external": {
+      "enabled": false,
+      "connection_string": "",
+      "table_prefix": "hyc_",
+      "pool_size": 5,
+      "max_overflow": 10
+    }
+  },
+  "mirrors": {
+    "docker-cn": {
+      "type": "docker",
+      "url": "https://docker.m.daocloud.io",
+      "target": "docker",
+      "enabled": false,
+      "storage_dir": "docker-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Docker 镜像 - DaoCloud",
+      "schedule": {
+        "enabled": false,
+        "type": "interval",
+        "interval": {
+          "hours": 6
+        }
+      }
+    },
+    "docker": {
+      "type": "docker",
+      "url": "https://registry-1.docker.io",
+      "target": "docker",
+      "enabled": false,
+      "storage_dir": "docker",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Docker 官方镜像",
+      "schedule": {
+        "enabled": false,
+        "type": "interval",
+        "interval": {
+          "hours": 6
+        }
+      }
+    },
+    "ubuntu": {
+      "type": "apt",
+      "url": "http://archive.ubuntu.com/ubuntu",
+      "target": "apt/ubuntu",
+      "enabled": false,
+      "storage_dir": "ubuntu",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Ubuntu 软件源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "ubuntu-cn": {
+      "type": "apt",
+      "url": "https://mirrors.tuna.tsinghua.edu.cn/ubuntu",
+      "target": "apt/ubuntu-cn",
+      "enabled": false,
+      "storage_dir": "ubuntu-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Ubuntu 镜像 - 清华源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "debian": {
+      "type": "apt",
+      "url": "http://deb.debian.org/debian",
+      "target": "apt/debian",
+      "enabled": false,
+      "storage_dir": "debian",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Debian 软件源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "debian-cn": {
+      "type": "apt",
+      "url": "https://mirrors.tuna.tsinghua.edu.cn/debian",
+      "target": "apt/debian-cn",
+      "enabled": false,
+      "storage_dir": "debian-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Debian 镜像 - 清华源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "centos": {
+      "type": "yum",
+      "url": "http://mirror.centos.org/centos",
+      "target": "yum/centos",
+      "enabled": false,
+      "storage_dir": "centos",
+      "auto_sync": false,
+      "custom": true,
+      "description": "CentOS 软件源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "almalinux": {
+      "type": "yum",
+      "url": "https://repo.almalinux.org/vault",
+      "target": "yum/almalinux",
+      "enabled": false,
+      "storage_dir": "almalinux",
+      "auto_sync": false,
+      "custom": true,
+      "description": "AlmaLinux 软件源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "archlinux": {
+      "type": "http",
+      "url": "https://geo.mirror.pkgbuild.com",
+      "target": "pacman",
+      "enabled": false,
+      "storage_dir": "archlinux",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Arch Linux 镜像",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "pypi": {
+      "type": "pypi",
+      "url": "https://pypi.org",
+      "target": "pypi",
+      "enabled": false,
+      "storage_dir": "pypi",
+      "auto_sync": false,
+      "custom": true,
+      "description": "PyPI 官方源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "pypi-cn": {
+      "type": "pypi",
+      "url": "https://pypi.tuna.tsinghua.edu.cn/simple",
+      "target": "pypi-cn",
+      "enabled": false,
+      "storage_dir": "pypi-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "PyPI 镜像 - 清华源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      },
+      "updated_at": "2026-02-18T15:37:32.588006"
+    },
+    "npm": {
+      "type": "npm",
+      "url": "https://registry.npmjs.org",
+      "target": "npm",
+      "enabled": false,
+      "storage_dir": "npm",
+      "auto_sync": false,
+      "custom": true,
+      "description": "NPM 官方源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "npm-cn": {
+      "type": "npm",
+      "url": "https://registry.npmmirror.com",
+      "target": "npm-cn",
+      "enabled": false,
+      "storage_dir": "npm-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "NPM 镜像 - 阿里源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "go": {
+      "type": "go",
+      "url": "https://proxy.golang.org",
+      "target": "go",
+      "enabled": false,
+      "storage_dir": "go",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Go 模块代理",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "go-cn": {
+      "type": "go",
+      "url": "https://goproxy.cn",
+      "target": "go-cn",
+      "enabled": false,
+      "storage_dir": "go-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Go 模块代理 - 七牛云",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "maven": {
+      "type": "http",
+      "url": "https://repo.maven.apache.org/maven2",
+      "target": "maven",
+      "enabled": false,
+      "storage_dir": "maven",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Maven 中央仓库",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "maven-cn": {
+      "type": "http",
+      "url": "https://maven.aliyun.com/repository/public",
+      "target": "maven-cn",
+      "enabled": false,
+      "storage_dir": "maven-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Maven 镜像 - 阿里云",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "gradle": {
+      "type": "http",
+      "url": "https://services.gradle.org/distributions",
+      "target": "gradle",
+      "enabled": false,
+      "storage_dir": "gradle",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Gradle 分发包",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "rubygems": {
+      "type": "http",
+      "url": "https://rubygems.org",
+      "target": "gem",
+      "enabled": false,
+      "storage_dir": "rubygems",
+      "auto_sync": false,
+      "custom": true,
+      "description": "RubyGems 官方源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "rubygems-cn": {
+      "type": "http",
+      "url": "https://gems.ruby-china.com",
+      "target": "gem-cn",
+      "enabled": false,
+      "storage_dir": "rubygems-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "RubyGems 镜像 - Ruby China",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "cargo": {
+      "type": "http",
+      "url": "https://crates.io",
+      "target": "cargo",
+      "enabled": false,
+      "storage_dir": "cargo",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Crates.io Rust 包",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "cargo-cn": {
+      "type": "http",
+      "url": "https://mirrors.tuna.tsinghua.edu.cn/crates.io-index",
+      "target": "cargo-cn",
+      "enabled": false,
+      "storage_dir": "cargo-cn",
+      "auto_sync": false,
+      "custom": true,
+      "description": "Cargo 镜像 - 清华源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "nuget": {
+      "type": "http",
+      "url": "https://api.nuget.org/v3/index.json",
+      "target": "nuget",
+      "enabled": false,
+      "storage_dir": "nuget",
+      "auto_sync": false,
+      "custom": true,
+      "description": "NuGet 官方源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "cocoapods": {
+      "type": "http",
+      "url": "https://cdn.cocoapods.org",
+      "target": "cocoapods",
+      "enabled": false,
+      "storage_dir": "cocoapods",
+      "auto_sync": false,
+      "custom": true,
+      "description": "CocoaPods 官方源",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "cran": {
+      "type": "http",
+      "url": "https://cloud.r-project.org",
+      "target": "cran",
+      "enabled": false,
+      "storage_dir": "cran",
+      "auto_sync": false,
+      "custom": true,
+      "description": "CRAN R 包镜像",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "ctan": {
+      "type": "http",
+      "url": "https://ctan.math.illinois.edu",
+      "target": "ctan",
+      "enabled": false,
+      "storage_dir": "ctan",
+      "auto_sync": false,
+      "custom": true,
+      "description": "CTAN LaTeX 包",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    },
+    "nvidia-cuda": {
+      "type": "http",
+      "url": "https://developer.download.nvidia.com/compute/cuda/repos",
+      "target": "cuda",
+      "enabled": false,
+      "storage_dir": "cuda",
+      "auto_sync": false,
+      "custom": true,
+      "description": "NVIDIA CUDA 仓库",
+      "schedule": {
+        "enabled": false,
+        "type": "cron",
+        "cron": "0 4 * * *"
+      }
+    }
+  },
+  "scheduled_tasks": {
+    "cleanup_db": {
+      "type": "cron",
+      "config": {
+        "cron": "0 2 * * *",
+        "enabled": false
+      }
+    }
+  },
+  "health_check": {
+    "enabled": true,
+    "interval": 60,
+    "timeout": 10,
+    "max_retries": 3,
+    "failure_threshold": 3
+  },
+  "failover": {
+    "enabled": false,
+    "threshold": 3
+  },
+  "alerts": {
+    "enabled": false,
+    "email": {
+      "enabled": false,
+      "smtp_host": "smtp.example.com",
+      "smtp_port": 587,
+      "smtp_user": "",
+      "smtp_password": "",
+      "from_address": "hyc-mirror@example.com",
+      "to_addresses": [],
+      "use_tls": true
+    },
+    "webhook": {
+      "enabled": false,
+      "url": ""
+    },
+    "rules": {
+      "disk_high": {
+        "enabled": true,
+        "threshold": 80,
+        "severity": "warning"
+      },
+      "disk_critical": {
+        "enabled": true,
+        "threshold": 90,
+        "severity": "critical"
+      },
+      "sync_failed": {
+        "enabled": true,
+        "severity": "error"
+      },
+      "source_unhealthy": {
+        "enabled": true,
+        "severity": "warning"
+      },
+      "service_down": {
+        "enabled": true,
+        "severity": "critical"
+      }
+    }
+  },
+  "webhooks": {
+    "enabled": false,
+    "storage": "webhooks.json",
+    "url": ""
+  },
+  "admin_keys_file": "admin_keys.json",
+  "auth_sessions_file": "auth_sessions.json",
+  "ssl": {
+    "enabled": false,
+    "cert": null,
+    "key": null
+  },
+  "rate_limit": 100,
+  "debug": false,
+  "debug_log_file": null,
+  "debug_http": false,
+  "debug_auth": false,
+  "debug_api": false,
+  "debug_v2": false,
+  "debug_error": false,
+  "debug_download": false,
+  "restart": {
+    "enabled": true,
+    "graceful_timeout": 30,
+    "shutdown_timeout": 10,
+    "strategy": "graceful"
+  },
+  "version": "2.2",
+  "sort_by": "name",
+  "sort_reverse": false,
+  "calculate_hash": false,
+  "max_search_results": 100,
+  "session_timeout": 60,
+  "sync_interval": 60,
+  "auto_sync": false,
+  "auto_clean": false,
+  "clean_interval": 7,
+  "enable_browse": true,
+  "show_hidden": false,
+  "enable_websocket": true,
+  "max_threads": 4,
+  "health_check_interval": 30,
+  "request_timeout": 300,
+  "enable_alerts": true,
+  "disk_warning_threshold": 80,
+  "disk_critical_threshold": 90,
+  "smtp_server": "",
+  "smtp_port": 587,
+  "smtp_from": "",
+  "alert_email": "",
+  "log_file": "./logs/hyc.log",
+  "log_level": "INFO",
+  "cache_size": 1073741824,
+  "cache_ttl": 3600,
+  "pool_size": 5,
+  "max_overflow": 10
+}

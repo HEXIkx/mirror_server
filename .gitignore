@@ -22,7 +22,7 @@ build/
 .zcf/
 *.log
 *.bak
-settings.json
+debug.txt
 admin_keys.json
 api_keys.json
 auth_sessions.json
