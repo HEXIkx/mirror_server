@@ -1,13 +1,14 @@
 # ============================================
 # PyInstaller 多架构构建镜像
 # ============================================
-FROM python:3.11-slim AS builder
+FROM python:3.11 AS builder
 
 WORKDIR /app
 
 # 安装构建依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
     musl-dev \
     libffi-dev \
     libssl-dev \
@@ -16,9 +17,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 复制整个项目
 COPY . .
 
-# 安装依赖和构建
-RUN pip install --no-cache-dir pyinstaller && \
-    pyinstaller --name hyc-download --onefile --clean --distpath /output main.py
+# 安装 PyInstaller（使用预编译 wheel）
+RUN pip install --no-cache-dir pyinstaller
+
+# 构建可执行文件
+RUN pyinstaller --name hyc-download --onefile --clean main.py
 
 FROM scratch
-COPY --from=builder /output/hyc-download /
+COPY --from=builder /app/dist/hyc-download /
