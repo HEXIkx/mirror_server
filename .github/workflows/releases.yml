@@ -9,23 +9,77 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  create-release:
     runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+  build:
+    needs: create-release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ needs.create-release.outputs.upload_url }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            platform: linux-amd64
+          - platform: linux/amd64
             artifact: hyc-download-linux-amd64
-          - os: ubuntu-latest
-            platform: linux-arm64
+          - platform: linux/arm64
             artifact: hyc-download-linux-arm64
-          - os: windows-latest
-            platform: windows-amd64
-            artifact: hyc-download-windows-amd64.exe
+          - platform: linux/arm/v7
+            artifact: hyc-download-linux-armv7
 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build executable
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.pyinstaller
+          platforms: ${{ matrix.platform }}
+          outputs: type=local,dest=output
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Find and upload artifact
+        run: |
+          find output -type f -executable -name "hyc-download*" -exec mv {} ${{ matrix.artifact }} \;
+          ls -la
+
+      - name: Upload artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ matrix.artifact }}
+          asset_name: ${{ matrix.artifact }}
+          asset_content_type: application/octet-stream
+
+  build-windows:
+    needs: create-release
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,58 +90,17 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install pyinstaller
+        run: pip install --upgrade pip pyinstaller
 
       - name: Build executable
-        if: matrix.platform != 'windows-amd64'
-        run: |
-          pyinstaller --name hyc-download \
-            --onefile \
-            --clean \
-            --distpath dist/${{ matrix.platform }} \
-            main.py
-
-      - name: Build executable (Windows)
-        if: matrix.platform == 'windows-amd64'
-        run: |
-          pyinstaller --name hyc-download \
-            --onefile \
-            --clean \
-            --distpath dist/${{ matrix.platform }} \
-            main.py
+        run: pyinstaller --name hyc-download --onefile --clean main.py
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.platform }}/
-          retention-days: 5
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Get tag name
-        id: tag
-        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "artifacts/**/*"
-          generateReleaseNotes: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.tag.outputs.TAG }}
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dist/hyc-download.exe
+          asset_name: hyc-download-windows-amd64.exe
+          asset_content_type: application/octet-stream
