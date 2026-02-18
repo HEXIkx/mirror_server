@@ -3,7 +3,7 @@
 # ============================================
 FROM python:3.11-slim AS builder
 
-WORKDIR /build
+WORKDIR /app
 
 # 安装构建依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,14 +13,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制依赖文件
-COPY requirements.txt .
-COPY main.py .
+# 复制整个项目
+COPY . .
 
-# 构建可执行文件
+# 安装依赖和构建
 RUN pip install --no-cache-dir pyinstaller && \
-    pyinstaller --name hyc-download --onefile --clean main.py && \
-    mv dist/hyc-download /output/
+    pyinstaller --name hyc-download --onefile --clean --distpath /output main.py
 
 FROM scratch
 COPY --from=builder /output/hyc-download /
