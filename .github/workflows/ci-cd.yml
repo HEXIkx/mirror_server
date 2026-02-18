@@ -120,7 +120,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            hycexit/hyc-download
+            hx100cv/hyc-download
           tags: |
             type=ref,event=branch
             type=sha,prefix=
