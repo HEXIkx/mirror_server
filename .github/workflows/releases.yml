@@ -1,0 +1,88 @@
+name: Build Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-amd64
+            artifact: hyc-download-linux-amd64
+          - os: ubuntu-latest
+            platform: linux-arm64
+            artifact: hyc-download-linux-arm64
+          - os: windows-latest
+            platform: windows-amd64
+            artifact: hyc-download-windows-amd64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pyinstaller
+
+      - name: Build executable
+        if: matrix.platform != 'windows-amd64'
+        run: |
+          pyinstaller --name hyc-download \
+            --onefile \
+            --clean \
+            --distpath dist/${{ matrix.platform }} \
+            main.py
+
+      - name: Build executable (Windows)
+        if: matrix.platform == 'windows-amd64'
+        run: |
+          pyinstaller --name hyc-download \
+            --onefile \
+            --clean \
+            --distpath dist/${{ matrix.platform }} \
+            main.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.platform }}/
+          retention-days: 5
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display artifacts
+        run: |
+          ls -la artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

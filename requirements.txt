@@ -1,4 +1,5 @@
 psutil>=5.9.0
+pyinstaller>=6.0.0
 python-multipart>=0.0.6
 paramiko>=2.11.0
 aiohttp>=3.9.0
