@@ -99,7 +99,7 @@ jobs:
 
       - name: Create zip archive
         run: |
-          Compress-Archive -Path dist/hyc-download/* -DestinationPath "dist/hyc-download-windows-amd64.zip" -Force
+          Compress-Archive -Path "dist/hyc-download/." -DestinationPath "dist/hyc-download-windows-amd64.zip" -Force
           echo "Zip created: dist/hyc-download-windows-amd64.zip"
           dir dist
 
