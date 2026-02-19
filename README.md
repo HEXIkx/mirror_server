@@ -149,7 +149,7 @@ python main.py --enable-mirrors=false  # 禁用
 
 ```json
 {
-  "sync_sources": {
+  "mirrors": {
     "my-http-mirror": {
       "type": "http",
       "url": "https://example.com/mirror/",
@@ -718,5 +718,6 @@ git push origin v1.0.0
 [![Contributors](https://contrib.rocks/image?repo=HEXIkx/mirror_server)](https://github.com/HEXIkx/mirror_server/graphs/contributors)
 
 ## License
+
 
 [The MIT License (MIT)](https://github.com/HEXIkx/mirror_server/blob/main/LICENSE)
