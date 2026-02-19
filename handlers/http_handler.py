@@ -27,27 +27,6 @@ def get_resource_path(relative_path):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), relative_path)
-    3. 最后是开发模式的源码路径
-    这样用户可以把可修改的文件放在外面
-    """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    # 打包模式
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        # 外部目录：与 exe 同级
-        external_path = os.path.join(os.path.dirname(sys.executable), relative_path)
-        if os.path.exists(external_path):
-            return external_path
-
-        # 打包后的资源路径（_MEIPASS）
-        bundled_path = os.path.join(sys._MEIPASS, relative_path)
-        if os.path.exists(bundled_path):
-            return bundled_path
-
-        return external_path
-
-    # 开发模式
-    return os.path.join(project_root, relative_path)
 
 
 class MirrorServerHandler(BaseHTTPRequestHandler):
@@ -70,7 +49,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             cls.debug_log_file = None
             return
 
-        # debug 可以是：
+        # debug 可以是:
         # - true/false: 全局开启/关闭
         # - 列表: 只开启指定的类别
         debug_setting = config.get('debug', False)
@@ -113,12 +92,12 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
 
         super().__init__(*args, **kwargs)
 
-        # 初始化API路由（使用共享的 auth_manager）
+        # 初始化API路由(使用共享的 auth_manager)
         if self.config is not None:
             # 从 config 中获取共享的 auth_manager
             self.auth_manager = self.config.get('_auth_manager')
             if not self.auth_manager:
-                # 如果没有，创建新的并保存到 config
+                # 如果没有,创建新的并保存到 config
                 MirrorServerHandler.api_router = APIRouter(self.config)
                 self.auth_manager = self.config.get('_auth_manager')
             if self.api_router is None:
@@ -126,15 +105,15 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
 
     def _is_debug_enabled(self, category):
         """检查特定调试类别是否启用"""
-        # 如果 debug_categories 为空，检查单个配置
+        # 如果 debug_categories 为空,检查单个配置
         if not MirrorServerHandler._debug_categories:
             return self.config and self.config.get(f'debug_{category}', False)
         return category in MirrorServerHandler._debug_categories
 
     def _debug_log(self, category, msg, color='\033[36m'):
-        """输出调试日志
-        - 如果没有设置 debug_log_file，默认在终端输出
-        - 如果设置了 debug_log_file，只输出到文件（错误除外）
+        """Output debug log
+        - If debug_log_file is not set, output to terminal by default
+        - If debug_log_file is set, output to file only (except errors)
         """
         if not self._is_debug_enabled(category):
             return
@@ -147,10 +126,10 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         self._write_debug_log(formatted_msg)
 
         # 是否在终端输出
-        # 如果设置了 debug_log_file，不在终端输出（除非是错误）
+        # 如果设置了 debug_log_file,不在终端输出(除非是错误)
         debug_log_file = MirrorServerHandler.debug_log_file
         if not debug_log_file:
-            # 没有设置日志文件，默认在终端输出
+            # 没有设置日志文件,默认在终端输出
             print(f"{color}{formatted_msg}\033[0m")
 
     def log_message(self, format_str, *args):
@@ -163,7 +142,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             msg = f"{self.address_string()} - {format_str % args}"
             self._debug_log('http', msg, '\033[36m')
 
-        # 详细模式输出（仅当没有设置 debug_log_file 时在终端输出）
+        # 详细模式输出(仅当没有设置 debug_log_file 时在终端输出)
         if is_verbose and not self._is_debug_enabled('http'):
             msg = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {self.address_string()} - {format_str % args}"
             print(msg)
@@ -187,7 +166,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         # 确定镜像类型
         if path.startswith("pypi/") or path.startswith("simple/"):
             mirror_type = "pypi"
-            mirror_path = path  # 保留完整路径，让 pypi.py 来处理
+            mirror_path = path  # 保留完整路径,让 pypi.py 来处理
         elif path.startswith("npm/"):
             mirror_type = "npm"
             mirror_path = path.replace("npm/", "")
@@ -229,7 +208,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         """获取或创建镜像处理器实例"""
         import sys
 
-        # 如果指定了镜像名称，优先使用该镜像的配置
+        # 如果指定了镜像名称,优先使用该镜像的配置
         cache_key = f"{mirror_type}:{mirror_name}" if mirror_name else mirror_type
 
         # 检查缓存
@@ -260,7 +239,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
 
         # 配置处理器 - 使用 base_dir 作为存储目录基础
         base_dir = self.config.get('base_dir', './downloads') if self.config else './downloads'
-        # 获取镜像配置的存储目录（相对路径），拼接到 base_dir 下
+        # 获取镜像配置的存储目录(相对路径),拼接到 base_dir 下
         storage_subdir = mirror_config.get('storage_dir', mirror_type)
         storage_dir = os.path.join(base_dir, storage_subdir)
         handler = handler_class({
@@ -290,11 +269,11 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         if not self.config:
             return True
 
-        # 公开端点（不需要认证）- 文件只读操作
+        # 公开端点(不需要认证)- 文件只读操作
         public_endpoints = [
             # 登录
             'api/v2/user/login',
-            # 文件只读：列表/搜索/下载/mirror/mc
+            # 文件只读:列表/搜索/下载/mirror/mc
             'api/v1/files',
             'api/v1/file/',
             'api/v1/search',
@@ -346,7 +325,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
                 is_protected = True
                 break
 
-        # 如果不是受保护端点，直接放行
+        # 如果不是受保护端点,直接放行
         if not is_protected:
             return True
 
@@ -448,11 +427,11 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             path = unquote(parsed_path.path).lstrip('/')
             query = parsed_path.query
 
-            # 检查认证（公开端点不需要认证）
+            # 检查认证(公开端点不需要认证)
             if not self.check_auth(path):
                 return
 
-            # 处理 /api/docs 和 /api/ui 路径（返回静态页面）
+            # 处理 /api/docs 和 /api/ui 路径(返回静态页面)
             if path.startswith("api/docs"):
                 # 提供 api/docs 目录下的静态文件
                 rel_path = path[9:]  # 去掉 "api/docs"
@@ -468,16 +447,16 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
                 self.serve_ui(rel_path)
                 return
             elif path.startswith("ui/") or path == "ui":
-                # /ui/ 路径已废弃，返回 404
+                # /ui/ 路径已废弃,返回 404
                 self.send_error(404, "UI moved to /api/ui/")
                 return
             elif path.startswith("docs/") or path == "docs":
-                # /docs/ 路径已废弃，返回 404
+                # /docs/ 路径已废弃,返回 404
                 self.send_error(404, "Docs moved to /api/docs/")
                 return
 
             # 处理 PyPI 包文件路径 - 转发到 API 路由
-            # 这些路径来自 pip 下载请求，如 /pypi/packages/hash/file.tar.gz
+            # 这些路径来自 pip 下载请求,如 /pypi/packages/hash/file.tar.gz
             if path.startswith("pypi/packages/") or path.startswith("pypi/web/") or path.startswith("pypi/simple/"):
                 # 转发到 API v2 路由
                 api_path = "api/v2/" + path
@@ -488,7 +467,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             if path.startswith("api/"):
                 # 使用API路由处理
                 self.api_router.handle_request(self, 'GET', path, query)
-            # 文件夹/文件访问（/pypi/ 也是本地文件夹）
+            # 文件夹/文件访问(/pypi/ 也是本地文件夹)
             elif path == "":
                 # 根路径显示文件列表
                 self.serve_path("")
@@ -531,7 +510,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
                 msg = f"\n=== DEBUG POST Path Check ===\n  path: '{path}'\n  starts with api/: {path.startswith('api/')}"
                 self._debug_log('http', msg, '\033[33m')
 
-            # 检查认证（公开端点不需要认证）
+            # 检查认证(公开端点不需要认证)
             if not self.check_auth(path):
                 return
 
@@ -550,7 +529,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             self.handle_error(500, f"服务器内部错误: {str(e)}")
 
     def do_OPTIONS(self):
-        """处理OPTIONS请求（CORS预检）"""
+        """处理OPTIONS请求(CORS预检)"""
         # 调试模式输出 (debug-http)
         if self._is_debug_enabled('http'):
             msg = f"\n=== DEBUG OPTIONS Request ===\n  Path: {self.path}"
@@ -755,7 +734,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             self.send_error(404, f"File not found: {rel_path}")
 
     def serve_path(self, rel_path):
-        """处理路径请求（文件或目录）"""
+        """处理路径请求(文件或目录)"""
         if self.config is None:
             self.send_error(500)
             return
@@ -777,7 +756,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def serve_directory(self, dir_path, rel_dir):
-        """提供目录浏览（镜像站风格）"""
+        """提供目录浏览(镜像站风格)"""
         try:
             # 检查是否有索引文件
             index_files = ['index.html', 'index.htm']
@@ -815,17 +794,17 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
                 except OSError:
                     continue
 
-            # 排序 - Windows 文件管理器风格：文件夹在前，按名称递增排序
+            # 排序 - Windows 文件管理器风格:文件夹在前,按名称递增排序
             sort_by = self.config.get('sort_by', 'name')
-            reverse = self.config.get('sort_reverse', False)  # 默认为 False（递增）
+            reverse = self.config.get('sort_reverse', False)  # 默认为 False(递增)
             if sort_by == 'name':
-                # 文件夹优先，然后按名称递增排序（不区分大小写）
+                # 文件夹优先,然后按名称递增排序(不区分大小写)
                 items.sort(key=lambda x: (not x["is_dir"], x["name"].lower()), reverse=False)
             elif sort_by == 'size':
-                # 文件夹优先，然后按大小递增排序
+                # 文件夹优先,然后按大小递增排序
                 items.sort(key=lambda x: (not x["is_dir"], os.path.getsize(os.path.join(dir_path, x["name"])) if not x["is_dir"] else 0), reverse=False)
             elif sort_by == 'modified':
-                # 文件夹优先，然后按修改时间递增排序
+                # 文件夹优先,然后按修改时间递增排序
                 items.sort(key=lambda x: (not x["is_dir"], os.path.getmtime(os.path.join(dir_path, x["name"]))), reverse=False)
 
         except OSError:
@@ -979,7 +958,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
                 </thead>
                 <tbody>"""
 
-        # 修复：只在非根目录显示上一级目录链接
+        # 修复:只在非根目录显示上一级目录链接
         if rel_dir:  # 如果不是根目录
             html += f'<tr class="dir"><td colspan="{colspan}"><a href="{parent_path}">../</a></td></tr>\n'
 
@@ -1004,7 +983,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         return html
 
     def send_file_headers(self, file_path):
-        """发送文件头信息（用于HEAD请求）"""
+        """发送文件头信息(用于HEAD请求)"""
         if not os.path.exists(file_path) or not os.path.isfile(file_path):
             self.send_error(404)
             return
@@ -1025,7 +1004,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def serve_file(self, file_path, rel_path):
-        """提供文件下载，支持断点续传和流式传输"""
+        """提供文件下载,支持断点续传和流式传输"""
         if not os.path.exists(file_path) or not os.path.isfile(file_path):
             self.send_error(404)
             return
@@ -1039,7 +1018,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         # 获取客户端IP
         client_ip = self.client_address[0] if hasattr(self, 'client_address') else 'unknown'
 
-        # 检查Range头部（支持断点续传）
+        # 检查Range头部(支持断点续传)
         range_header = self.headers.get('Range')
         range_start = 0
         range_end = file_size - 1
@@ -1064,13 +1043,13 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             # 完整文件下载
             self.send_response(200)
         else:
-            # 部分内容（206）
+            # 部分内容(206)
             self.send_response(206)
             self.send_header("Content-Range", f"bytes {range_start}-{range_end}/{file_size}")
 
         self.send_header("Content-Type", mime_type)
         self.send_header("Content-Length", str(content_length))
-        # HTML 文件直接在浏览器中显示，不强制下载
+        # HTML 文件直接在浏览器中显示,不强制下载
         if mime_type == 'text/html':
             self.send_header("Content-Disposition", f'inline; filename="{os.path.basename(file_path)}"')
         else:
@@ -1104,12 +1083,12 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"文件传输错误: {e}")
 
-        # 只对真正的下载（非 HTML 页面）更新统计和记录
+        # 只对真正的下载(非 HTML 页面)更新统计和记录
         if self.config.get('enable_stats', True) and mime_type != 'text/html':
             self.record_download(rel_path, file_size, client_ip)
 
     def record_download(self, filepath, file_size=0, client_ip='unknown'):
-        """记录下载（同时更新计数和创建下载记录）"""
+        """记录下载(同时更新计数和创建下载记录)"""
         if not self.config.get('enable_stats', True):
             if hasattr(self, '_debug_log') and self._is_debug_enabled('download'):
                 self._debug_log('download', f"Stats disabled, skipping download record for: {filepath}")
@@ -1122,7 +1101,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
 
         if db:
             try:
-                # 尝试更新 FileRecord 的下载计数（通过路径查找）
+                # 尝试更新 FileRecord 的下载计数(通过路径查找)
                 try:
                     record = db.get_file_by_path(filepath)
                     if record:
@@ -1149,7 +1128,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
                     self._debug_log('download', f"Error recording download: {e}")
 
     def _serve_file_chunked(self, file_path, rel_path, chunk_size=64*1024):
-        """流式分块传输文件（用于大文件）- 备用功能"""
+        """流式分块传输文件(用于大文件)- 备用功能"""
         if not os.path.exists(file_path) or not os.path.isfile(file_path):
             self.send_error(404)
             return
@@ -1175,7 +1154,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"流式传输错误: {e}")
 
-        # 更新统计（serve_file_chunked 只用于真正的下载）
+        # 更新统计(serve_file_chunked 只用于真正的下载)
         if self.config.get('enable_stats', True):
             self.update_download_count(rel_path)
 
@@ -1269,7 +1248,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
     <div class="error-container">
         <h1 class="error-code">{code}</h1>
         <h2 class="error-message">{message}</h2>
-        <p class="error-description">请求的页面遇到问题，请稍后重试。</p>
+        <p class="error-description">请求的页面遇到问题,请稍后重试.</p>
         <a href="/" class="home-link">返回首页</a>
     </div>
 </body>
@@ -1294,11 +1273,11 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         return None
 
     def load_stats(self):
-        """加载下载统计信息（优先使用数据库，回退到JSON）"""
+        """加载下载统计信息(优先使用数据库,回退到JSON)"""
         db = self._get_db()
         if db:
             try:
-                # 使用专门的方法获取下载统计，避免会话问题
+                # 使用专门的方法获取下载统计,避免会话问题
                 return db.get_download_stats(limit=10000)
             except Exception as e:
                 print(f"Error loading stats from database: {e}")
@@ -1314,10 +1293,10 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         return {}
 
     def save_stats(self, stats):
-        """保存下载统计信息（优先使用数据库，回退到JSON）"""
+        """保存下载统计信息(优先使用数据库,回退到JSON)"""
         db = self._get_db()
         if db:
-            # 数据库模式下，stats 由数据库直接管理，不需要手动保存
+            # 数据库模式下,stats 由数据库直接管理,不需要手动保存
             return
 
         # 回退到 JSON 文件
@@ -1356,14 +1335,14 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         return sum(stats.values())
 
     def update_download_count(self, filepath):
-        """更新文件的下载计数（优先使用数据库，通过路径查找）"""
+        """更新文件的下载计数(优先使用数据库,通过路径查找)"""
         if not self.config.get('enable_stats', True):
             return
 
         db = self._get_db()
         if db:
             try:
-                # 通过路径查找记录，获取 file_id
+                # 通过路径查找记录,获取 file_id
                 record = db.get_file_by_path(filepath)
                 if record:
                     db.increment_download_count(record.file_id)
@@ -1379,7 +1358,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
     # ==================== 下载历史记录 ====================
 
     def load_download_history(self, limit=100):
-        """加载下载历史记录（优先使用数据库，回退到JSON）"""
+        """加载下载历史记录(优先使用数据库,回退到JSON)"""
         db = self._get_db()
         if db:
             try:
@@ -1410,10 +1389,10 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
         return []
 
     def save_download_history(self, history):
-        """保存下载历史记录（数据库模式下不需要）"""
+        """保存下载历史记录(数据库模式下不需要)"""
         db = self._get_db()
         if db:
-            # 数据库模式下，history 由数据库直接管理
+            # 数据库模式下,history 由数据库直接管理
             return
 
         # 回退到 JSON 文件
@@ -1429,7 +1408,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
             print(f"Error saving download history: {e}")
 
     def _log_download(self, filepath, file_size=0):
-        """记录下载历史（优先使用数据库）- 备用功能"""
+        """记录下载历史(优先使用数据库)- 备用功能"""
         if not self.config.get('enable_stats', True):
             return
 

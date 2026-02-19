@@ -95,6 +95,7 @@ jobs:
 
       - name: Build executable (onedir mode)
         run: |
+          $env:PYTHONIOENCODING="utf-8"
           pyinstaller --onedir --name hyc-download --clean main.py --add-data "api;api" --add-data "core;core" --add-data "handlers;handlers" --add-data "mirrors;mirrors" --add-data "settings.json;."
 
       - name: Create zip archive
