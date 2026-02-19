@@ -460,6 +460,11 @@ class DatabaseManager:
         try:
             # 尝试创建所有表
             Base.metadata.create_all(self.engine)
+            # 对于 MySQL，需要提交事务
+            if self.db_type == 'mysql':
+                from sqlalchemy import text
+                with self.engine.connect() as conn:
+                    conn.commit()
         except Exception as e:
             print(f"警告: 创建表结构失败: {e}")
             print("将尝试创建数据库...")
@@ -512,9 +517,10 @@ class DatabaseManager:
                     database = db_config.get('database', 'hyc')
                     try:
                         conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {database} CHARACTER SET utf8mb4"))
+                        conn.commit()  # 提交事务
                         print(f"已创建/确认数据库: {database}")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"警告: 创建数据库失败: {e}")
                 temp_engine.dispose()
 
         except Exception as e:
