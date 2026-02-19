@@ -95,7 +95,7 @@ jobs:
 
       - name: Build executable (onedir mode)
         run: |
-          pyinstaller --onedir --name hyc-download --clean main.py
+          pyinstaller pyinstaller.spec
 
       - name: Create zip archive
         run: |
