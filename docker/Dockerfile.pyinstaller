@@ -17,11 +17,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 复制整个项目
 COPY . .
 
-# 安装 PyInstaller（使用预编译 wheel）
-RUN pip install --no-cache-dir pyinstaller
+# 安装 PyInstaller 和项目依赖
+RUN pip install --no-cache-dir pyinstaller -r requirements.txt
 
-# 构建可执行文件
-RUN pyinstaller --name hyc-download --onefile --clean main.py
+# 构建可执行文件（使用 .spec 文件）
+RUN pyinstaller pyinstaller.spec
 
 FROM scratch
 COPY --from=builder /app/dist/hyc-download /
