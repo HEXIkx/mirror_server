@@ -4,6 +4,7 @@
 """HTTP请求处理模块"""
 
 import os
+import sys
 import json
 import re
 import time
@@ -18,6 +19,14 @@ from urllib.parse import unquote, urlparse, parse_qs
 from core.utils import format_file_size, get_file_hash, sanitize_filename, is_safe_path
 from api.router import APIRouter
 from mirrors import get_mirror_handler
+
+
+# PyInstaller 资源路径处理
+def get_resource_path(relative_path):
+    """获取打包后的资源路径"""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), relative_path)
 
 
 class MirrorServerHandler(BaseHTTPRequestHandler):
@@ -605,8 +614,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
 
     def serve_docs(self, rel_path):
         """提供 api/docs 目录下的静态文件"""
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # handlers 目录的父目录
-        docs_dir = os.path.join(base_dir, 'api', 'docs')
+        docs_dir = get_resource_path('api/docs')
 
         if not os.path.isdir(docs_dir):
             self.send_error(404, "Docs directory not found")
@@ -703,8 +711,7 @@ class MirrorServerHandler(BaseHTTPRequestHandler):
 
     def serve_ui(self, rel_path):
         """提供 api/ui 目录下的静态文件"""
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # handlers 目录的父目录
-        ui_dir = os.path.join(base_dir, 'api', 'ui')
+        ui_dir = get_resource_path('api/ui')
 
         if not os.path.isdir(ui_dir):
             self.send_error(404, "UI directory not found")

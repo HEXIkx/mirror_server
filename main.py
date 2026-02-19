@@ -13,8 +13,17 @@ import signal
 import argparse
 import time
 
+# PyInstaller 资源路径处理
+def get_resource_path(relative_path):
+    """获取打包后的资源路径"""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # 打包后的路径
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
+
 # 添加项目根目录到Python路径
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+base_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, base_dir)
 
 from core.config import ConfigManager, load_config_file, deep_merge, load_settings_with_override
 from core.server import MirrorServer

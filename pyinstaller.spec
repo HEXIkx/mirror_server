@@ -8,7 +8,13 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ('api', 'api'),
+        ('core', 'core'),
+        ('handlers', 'handlers'),
+        ('mirrors', 'mirrors'),
+        ('settings.json', '.'),
+    ],
     hiddenimports=[
         # aiohttp
         'aiohttp',
