@@ -2,18 +2,26 @@
 """
 PyInstaller 打包配置
 """
+import os
 import sys
+
+# 获取项目根目录
+def get_abs_path(path):
+    """获取绝对路径"""
+    if os.path.isabs(path):
+        return path
+    return os.path.join(os.getcwd(), path)
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[os.getcwd()],
     binaries=[],
     datas=[
-        ('api', 'api'),
-        ('core', 'core'),
-        ('handlers', 'handlers'),
-        ('mirrors', 'mirrors'),
-        ('settings.json', '.'),
+        (get_abs_path('api'), 'api'),
+        (get_abs_path('core'), 'core'),
+        (get_abs_path('handlers'), 'handlers'),
+        (get_abs_path('mirrors'), 'mirrors'),
+        (get_abs_path('settings.json'), '.'),
     ],
     hiddenimports=[
         # aiohttp
@@ -285,24 +293,18 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
+# 使用 EXE() 创建 --onefile 单文件模式
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
     a.zipfiles,
     a.datas,
-    [],
     name='hyc-download',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
-    runtime_tmpdir=None,
     console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
 )

@@ -4,12 +4,38 @@
 """配置管理模块"""
 
 import os
+import sys
 import json
 import hashlib
 import time
 from typing import Dict, Any, Optional
 
 from .utils import parse_size
+
+
+def get_resource_path(relative_path: str) -> str:
+    """获取打包后的资源路径"""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # 打包后的路径
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), relative_path)
+
+    # 打包模式
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # 外部目录：与 exe 同级
+        external_path = os.path.join(os.path.dirname(sys.executable), relative_path)
+        if os.path.exists(external_path):
+            return external_path
+
+        # 打包后的资源路径（_MEIPASS）
+        bundled_path = os.path.join(sys._MEIPASS, relative_path)
+        if os.path.exists(bundled_path):
+            return bundled_path
+
+        return external_path
+
+    # 开发模式
+    return os.path.join(project_root, relative_path)
 
 
 def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -71,10 +97,8 @@ class ConfigManager:
             settings_path = config
             config = None
         elif settings_path is None:
-            settings_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'settings.json'
-            )
+            # 使用打包后的资源路径
+            settings_path = get_resource_path('settings.json')
         elif settings_path:
             settings_path = settings_path
 

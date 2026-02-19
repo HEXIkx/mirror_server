@@ -20,7 +20,7 @@ COPY . .
 # 安装 PyInstaller 和项目依赖
 RUN pip install --no-cache-dir pyinstaller -r requirements.txt
 
-# 构建可执行文件（使用 .spec 文件）
+# 构建可执行文件（使用 .spec 文件生成单文件）
 RUN pyinstaller pyinstaller.spec
 
 FROM scratch

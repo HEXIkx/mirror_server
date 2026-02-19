@@ -93,22 +93,15 @@ jobs:
       - name: Install dependencies
         run: pip install --upgrade pip pyinstaller -r requirements.txt
 
-      - name: Build executable
+      - name: Build executable (onedir mode)
         run: |
-          pip install --upgrade pip pyinstaller -r requirements.txt
-          pyinstaller --clean pyinstaller.spec
-          python -c "
-          import zipfile
-          import os
-          os.makedirs('dist', exist_ok=True)
-          with zipfile.ZipFile('dist/hyc-download-windows-amd64.zip', 'w', zipfile.ZIP_DEFLATED) as zf:
-              for root, dirs, files in os.walk('dist/hyc-download'):
-                  for f in files:
-                      path = os.path.join(root, f)
-                      arcname = os.path.relpath(path, 'dist')
-                      zf.write(path, arcname)
-          print('Zip created: dist/hyc-download-windows-amd64.zip')
-          "
+          pyinstaller --onedir --name hyc-download --clean main.py
+
+      - name: Create zip archive
+        run: |
+          Compress-Archive -Path dist/hyc-download/* -DestinationPath "dist/hyc-download-windows-amd64.zip" -Force
+          echo "Zip created: dist/hyc-download-windows-amd64.zip"
+          dir dist
 
       - name: Upload artifact
         uses: actions/upload-release-asset@v1

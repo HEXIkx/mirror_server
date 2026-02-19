@@ -27,6 +27,27 @@ def get_resource_path(relative_path):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), relative_path)
+    3. 最后是开发模式的源码路径
+    这样用户可以把可修改的文件放在外面
+    """
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # 打包模式
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # 外部目录：与 exe 同级
+        external_path = os.path.join(os.path.dirname(sys.executable), relative_path)
+        if os.path.exists(external_path):
+            return external_path
+
+        # 打包后的资源路径（_MEIPASS）
+        bundled_path = os.path.join(sys._MEIPASS, relative_path)
+        if os.path.exists(bundled_path):
+            return bundled_path
+
+        return external_path
+
+    # 开发模式
+    return os.path.join(project_root, relative_path)
 
 
 class MirrorServerHandler(BaseHTTPRequestHandler):
