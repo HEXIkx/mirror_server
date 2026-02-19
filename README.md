@@ -643,6 +643,63 @@ python main.py --ssl-cert cert.pem --ssl-key key.pem
 
 详细说明请参考 [DOCKER.md](DOCKER.md)
 
+## CI/CD 自动构建
+
+项目使用 GitHub Actions 自动构建 Docker 镜像和可执行文件。
+
+### GitHub Actions 工作流
+
+| 工作流文件 | 触发条件 | 功能 |
+|------------|----------|------|
+| `.github/workflows/releases.yml` | 打 Tag (`v*`) | 构建并发布二进制可执行文件到 GitHub Releases |
+| `.github/workflows/docker-multiarch.yml` | 打 Tag (`v*`) | 构建并推送多架构 Docker 镜像到 Docker Hub |
+| `.github/workflows/ci-cd.yml` | push main / PR | 运行测试 |
+
+### 发布新版本
+
+```bash
+# 1. 推送所有代码
+git push origin main
+
+# 2. 创建版本标签
+git tag v1.0.0
+
+# 3. 推送到远程
+git push origin v1.0.0
+```
+
+推送 Tag 后，GitHub Actions 会自动：
+- ✅ 构建 4 个架构的二进制文件（Linux AMD64/ARM64/ARMv7 + Windows AMD64）
+- ✅ 构建 3 个架构的 Docker 镜像（AMD64/ARM64/ARMv7）
+- ✅ 上传到 GitHub Releases
+- ✅ 推送到 Docker Hub 和 GitHub Container Registry
+
+### GitHub Secrets 配置
+
+需要配置以下 Secrets 才能正常工作：
+
+| Secret 名称 | 值 | 说明 |
+|-------------|-----|------|
+| `DOCKERHUB_USERNAME` | Docker Hub 用户名 | |
+| `DOCKERHUB_TOKEN` | Docker Hub Access Token | |
+
+### Docker Hub 镜像
+
+构建完成后，镜像会自动推送到：
+- **Docker Hub**: `hx100cv/hyc-download:latest`
+- **GitHub Container Registry**: `ghcr.io/hexikx/mirror_server:latest`
+
+### GitHub Releases
+
+每个版本会生成以下文件：
+
+| 文件名 | 说明 |
+|--------|------|
+| `hyc-download-linux-amd64` | Linux x64 可执行文件 |
+| `hyc-download-linux-arm64` | Linux ARM64 可执行文件 |
+| `hyc-download-linux-armv7` | Linux ARMv7 可执行文件 |
+| `hyc-download-windows-amd64.exe` | Windows x64 可执行文件 |
+
 ## 许可
 
 本项目仅供学习和研究使用。
