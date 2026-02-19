@@ -96,10 +96,11 @@ jobs:
       - name: Build executable
         run: |
           pip install --upgrade pip pyinstaller -r requirements.txt
-          pyinstaller --name hyc-download --onedir --clean pyinstaller.spec
+          pyinstaller --clean pyinstaller.spec
           python -c "
           import zipfile
           import os
+          os.makedirs('dist', exist_ok=True)
           with zipfile.ZipFile('dist/hyc-download-windows-amd64.zip', 'w', zipfile.ZIP_DEFLATED) as zf:
               for root, dirs, files in os.walk('dist/hyc-download'):
                   for f in files:
