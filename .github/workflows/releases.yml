@@ -91,10 +91,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install --upgrade pip pyinstaller
+        run: pip install --upgrade pip pyinstaller -r requirements.txt
 
       - name: Build executable
-        run: pyinstaller --name hyc-download --onefile --clean main.py
+        run: pyinstaller --name hyc-download --onefile --clean --hidden-import=sqlalchemy --hidden-import=sqlalchemy.orm main.py
 
       - name: Upload artifact
         uses: actions/upload-release-asset@v1
