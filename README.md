@@ -700,6 +700,14 @@ git push origin v1.0.0
 | `hyc-download-linux-armv7` | Linux ARMv7 可执行文件 |
 | `hyc-download-windows-amd64.exe` | Windows x64 可执行文件 |
 
+## Stargazers over time
+
+[![Stargazers over time](https://starchart.cc/HEXIkx/mirror_server.svg?variant=adaptive)](https://starchart.cc/HEXIkx/mirror_server)
+
+## Contributors
+
+[![Contributors](https://contrib.rocks/image?repo=HEXIkx/mirror_server)](https://github.com/HEXIkx/mirror_server/graphs/contributors)
+
 ## License
 
 [The MIT License (MIT)](https://github.com/HEXIkx/mirror_server/blob/main/LICENSE)
