@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-HYC下载站 v2.2 - 完整增强版
+HYC下载站 v2.3 - 完整增强版
 主入口文件
 支持镜像同步、下载加速源、系统监控、实时通信等
 """
@@ -45,7 +45,7 @@ def signal_handler(signum, _frame):
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
-        description='HYC下载站 v2.2 - 镜像文件服务器 + 下载加速源',
+        description='HYC下载站 v2.3 - 镜像文件服务器 + 下载加速源',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 示例:
@@ -451,7 +451,7 @@ def main():
     # 打印启动信息
     print()
     print("╔" + "═" * 58 + "╗")
-    print("║" + " " * 22 + "HYC下载站 v2.2" + " " * 22 + "║")
+    print("║" + " " * 22 + "HYC下载站 v2.3" + " " * 22 + "║")
     print("╚" + "═" * 58 + "╝")
 
     print()

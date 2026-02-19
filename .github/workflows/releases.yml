@@ -94,7 +94,20 @@ jobs:
         run: pip install --upgrade pip pyinstaller -r requirements.txt
 
       - name: Build executable
-        run: pyinstaller --name hyc-download --onefile --clean --hidden-import=sqlalchemy --hidden-import=sqlalchemy.orm main.py
+        run: |
+          pip install --upgrade pip pyinstaller -r requirements.txt
+          pyinstaller --name hyc-download --onedir --clean pyinstaller.spec
+          python -c "
+          import zipfile
+          import os
+          with zipfile.ZipFile('dist/hyc-download-windows-amd64.zip', 'w', zipfile.ZIP_DEFLATED) as zf:
+              for root, dirs, files in os.walk('dist/hyc-download'):
+                  for f in files:
+                      path = os.path.join(root, f)
+                      arcname = os.path.relpath(path, 'dist')
+                      zf.write(path, arcname)
+          print('Zip created: dist/hyc-download-windows-amd64.zip')
+          "
 
       - name: Upload artifact
         uses: actions/upload-release-asset@v1
@@ -102,6 +115,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dist/hyc-download.exe
-          asset_name: hyc-download-windows-amd64.exe
-          asset_content_type: application/octet-stream
+          asset_path: dist/hyc-download-windows-amd64.zip
+          asset_name: hyc-download-windows-amd64.zip
+          asset_content_type: application/zip
