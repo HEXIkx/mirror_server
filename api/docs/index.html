@@ -413,7 +413,7 @@
 
     <!-- 侧边栏 -->
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-title">HYC下载站 API v2.2</div>
+        <div class="sidebar-title">HYC下载站 API v2.3</div>
         <div class="sidebar-content">
             <div class="sidebar-section">
                 <div class="sidebar-section-title">快速开始</div>
@@ -472,8 +472,6 @@
             <div class="sidebar-section">
                 <div class="sidebar-section-title">管理</div>
                 <a class="nav-link" href="#admin">认证管理</a>
-                <a class="nav-link sub" href="#keys">API 密钥</a>
-                <a class="nav-link sub" href="#sessions">会话</a>
                 <a class="nav-link sub" href="#webhooks">Webhooks</a>
                 <a class="nav-link" href="#ws">WebSocket</a>
                 <a class="nav-link" href="#sse">SSE</a>
@@ -491,42 +489,33 @@
         <div class="card" id="quickstart">
             <h2 class="card-title">快速开始</h2>
             <div class="code">
-<span class="c"># 设置 API Key</span>
-export API_KEY=<span class="s">"your-api-key"</span>
-
 <span class="c"># 健康检查</span>
 curl http://localhost:8080/api/v1/health
 
 <span class="c"># 获取文件列表</span>
 curl http://localhost:8080/api/v1/files
 
-<span class="c"># 认证请求</span>
-curl -H <span class="s">"X-API-Key: $API_KEY"</span> http://localhost:8080/api/v2/admin/stats
+<span class="c"># 下载文件</span>
+curl -O http://localhost:8080/downloads/ubuntu-22.04.iso
             </div>
         </div>
 
         <!-- 认证方式 -->
         <div class="card" id="auth">
             <h2 class="card-title">认证方式</h2>
-            <div class="auth-row">
-                <span class="auth-name">API Key</span>
-                <span class="auth-value">X-API-Key: xxx</span>
-                <span class="auth-desc">推荐方式</span>
-            </div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">
+                项目支持可选认证功能，通过 <code>settings.json</code> 配置。
+                当 <code>auth_type: none</code> 时，所有接口无需认证即可访问（默认模式）。
+            </p>
             <div class="auth-row">
                 <span class="auth-name">Bearer</span>
-                <span class="auth-value">Authorization: Bearer token</span>
+                <span class="auth-value">Authorization: Bearer &lt;token&gt;</span>
                 <span class="auth-desc">JWT Token</span>
             </div>
             <div class="auth-row">
-                <span class="auth-name">Cookie</span>
-                <span class="auth-value">hyc_auth=session</span>
-                <span class="auth-desc">Session</span>
-            </div>
-            <div class="auth-row">
-                <span class="auth-name">Query</span>
-                <span class="auth-value">?key=xxx</span>
-                <span class="auth-desc">URL 参数</span>
+                <span class="auth-name">Basic</span>
+                <span class="auth-value">Authorization: Basic &lt;base64&gt;</span>
+                <span class="auth-desc">用户名:密码 认证</span>
             </div>
         </div>
 
@@ -931,29 +920,8 @@ curl -H <span class="s">"X-API-Key: $API_KEY"</span> http://localhost:8080/api/v
         <div class="card" id="admin">
             <h2 class="card-title">认证管理</h2>
             <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/admin/auth/verify</span></div>
-            <div class="code">{<span class="v">"valid"</span>: <span class="k">true</span>, <span class="v">"level"</span>: <span class="s">"admin"</span>, <span class="v">"permissions"</span>: [...]}</div>
-
-            <h3 class="card-title-sm" id="keys">API 密钥</h3>
-            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/admin/keys</span> (admin)</div>
-            <div class="api-line"><span class="method method-post">POST</span><span class="api-path">/api/v2/admin/keys</span> (admin)</div>
-            <div class="code">{<span class="v">"name"</span>: <span class="s">"New Key"</span>, <span class="v">"level"</span>: <span class="s">"user"</span>, <span class="v">"permissions"</span>: [<span class="s">"files:read"</span>]}</div>
-
-            <h3 class="card-title-sm">密钥状态</h3>
-            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/admin/keys/{id}/disable</span> (admin)</div>
-            <div class="api-line"><span class="method method-put">PUT</span><span class="api-path">/api/v2/admin/keys/{id}/enable</span> (admin)</div>
-
-            <h3 class="card-title-sm">删除密钥</h3>
-            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v2/admin/keys/{id}</span> (admin)</div>
-
-            <h3 class="card-title-sm" id="sessions">会话管理</h3>
-            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/admin/sessions</span> (admin)</div>
-            <div class="api-line"><span class="method method-delete">DELETE</span><span class="api-path">/api/v2/admin/sessions/{id}</span> (admin)</div>
-
-            <h3 class="card-title-sm">认证统计</h3>
-            <div class="api-line"><span class="method method-get">GET</span><span class="api-path">/api/v2/admin/stats</span> (admin)</div>
-            <div class="code">
-{<span class="v">"total_keys"</span>: <span class="n">15</span>, <span class="v">"enabled_keys"</span>: <span class="n">12</span>, <span class="v">"active_sessions"</span>: <span class="n">5</span>}
-            </div>
+            <div class="code">{<span class="v">"valid"</span>: <span class="k">true</span>, <span class="v">"level"</span>: <span class="s">"admin"</span>, <span class="v">"user_id"</span>: <span class="s">"admin"</span>, <span class="v">"permissions"</span>: [...]}</div>
+            <div class="code">{<span class="v">"valid"</span>: <span class="k">false</span>, <span class="v">"error"</span>: <span class="s">"Invalid credentials"</span>}</div>
         </div>
 
         <!-- Webhooks -->
@@ -1017,7 +985,7 @@ Accept: <span class="s">text/event-stream</span>
         </div>
 
         <p style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px 0;">
-            HYC下载站 API v2.2.0 · 最后更新 2024-01-15
+            HYC下载站 API v2.3.0 · 最后更新 2026-02-19
         </p>
     </main>
 

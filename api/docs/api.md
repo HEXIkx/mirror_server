@@ -1,29 +1,61 @@
-# HYC下载站 v2.2 - API 文档
+# HYC下载站 v2.3 - API 文档
 
 ## 快速开始
 
 ```bash
-# 设置 API Key
-export API_KEY="your-api-key-here"
-
 # 测试健康检查
 curl http://localhost:8080/api/v1/health
 
 # 获取文件列表
 curl http://localhost:8080/api/v1/files
 
-# 认证请求示例
-curl -H "X-API-Key: $API_KEY" http://localhost:8080/api/v2/admin/stats
+# 下载文件
+curl -O http://localhost:8080/downloads/ubuntu-22.04.iso
 ```
 
 ## 认证方式
 
-| 方式 | 说明 |
-|------|------|
-| `Authorization: Bearer <token>` | Bearer Token |
-| `X-API-Key: <key>` | API Key (推荐) |
-| `Cookie: hyc_auth=<session>` | Session Cookie |
-| `?key=<query>` | Query Parameter |
+项目支持可选的认证功能，通过 `settings.json` 配置。
+
+### 公开访问模式（默认）
+
+```json
+{
+  "auth_type": "none"
+}
+```
+
+当 `auth_type: none` 时，所有接口无需认证即可访问，适合公开下载站点。
+
+### 启用认证
+
+如需启用认证：
+
+```json
+{
+  "auth_type": "basic",
+  "auth_user": "admin",
+  "auth_pass": "yourpassword"
+}
+```
+
+或使用 Token 认证：
+
+```json
+{
+  "auth_type": "token",
+  "auth_token": "your-secret-token"
+}
+```
+
+**支持的认证方式：**
+
+| 方式 | 请求头 |
+|------|--------|
+| Bearer Token | `Authorization: Bearer <token>` |
+| Basic Auth | `Authorization: Basic <base64(username:password)>` |
+
+**注意：** 旧版 `api_keys.json` 已被 `admin_keys.json` 替代。
 
 ---
 
@@ -95,6 +127,62 @@ curl -H "X-API-Key: $API_KEY" http://localhost:8080/api/v2/admin/stats
 {
   "error": "File not found",
   "path": "nonexistent.iso"
+}
+```
+
+---
+
+### 文件预览
+
+**GET** `/api/v1/file/{path}/preview`
+
+预览图片、JSON、Markdown、文本、PDF、音频等文件。
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| path | string | 是 | 文件路径 |
+
+**响应示例（图片）：**
+```json
+{
+  "path": "images/logo.png",
+  "name": "logo.png",
+  "size": 24576,
+  "type": "image/png",
+  "preview_available": true,
+  "preview_type": "image",
+  "data_url": "data:image/png;base64,iVBORw0KGgo...",
+  "truncated": false
+}
+```
+
+**响应示例（JSON）：**
+```json
+{
+  "path": "config.json",
+  "name": "config.json",
+  "size": 1024,
+  "type": "application/json",
+  "preview_available": true,
+  "preview_type": "json",
+  "content": {
+    "server_name": "HYC Download",
+    "port": 8080
+  },
+  "truncated": false
+}
+```
+
+**支持的预览类型：** 图片、SVG、JSON、Markdown、XML、CSV、YAML、音频、PDF、文本文件
+
+**错误响应 (413)：**
+```json
+{
+  "error": "File too large for preview (max 10 MB)",
+  "file_size": 15728640,
+  "max_preview_size": 10485760
 }
 ```
 
@@ -277,7 +365,41 @@ curl -H "X-API-Key: $API_KEY" http://localhost:8080/api/v2/admin/stats
 
 ### 删除同步源
 
-**DELETE** `/api/v1/sync/{name}` (需要认证)
+**DELETE** `/api/v1/sync/sources/{name}` (需要认证)
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "message": "Sync source deleted",
+  "name": "ubuntu-releases"
+}
+```
+
+---
+
+### 更新同步源配置
+
+**PUT** `/api/v1/sync/sources/{name}` (需要认证)
+
+**请求体：**
+```json
+{
+  "config": {
+    "enabled": true,
+    "auto_sync": true,
+    "schedule": "0 2 * * *"
+  }
+}
+```
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "name": "ubuntu-releases"
+}
+```
 
 ---
 
@@ -394,60 +516,70 @@ curl -H "X-API-Key: $API_KEY" http://localhost:8080/api/v2/admin/stats
 
 ---
 
-## 缓存管理
+### 压缩/解压缩
 
-### 获取缓存统计
+**POST** `/api/v1/archive` (需要认证)
 
-**GET** `/api/v1/cache/stats`
-
-**响应示例：**
+**请求体：**
 ```json
 {
-  "size": 10737418240,
-  "size_formatted": "10.0 GB",
-  "count": 1520,
-  "hit_rate": 85.5,
-  "expired_count": 45,
-  "last_clean": "2024-01-15T02:00:00"
+  "operation": "compress",  // 或 "extract"
+  "files": ["file1.txt", "file2.txt"],
+  "archive_name": "archive.zip",
+  "target_dir": ""
+}
+```
+
+**压缩响应示例：**
+```json
+{
+  "operation": "compress",
+  "archive_path": "archive.zip",
+  "compressed_files": 2,
+  "archive_size": 1048576
+}
+```
+
+**解压缩响应示例：**
+```json
+{
+  "operation": "extract",
+  "extract_dir": "",
+  "extracted_files": 5
+}
+```
+
+**错误响应 (400)：**
+```json
+{
+  "error": "Invalid operation"
 }
 ```
 
 ---
 
-### 清理缓存
+### 获取服务器配置
 
-**POST** `/api/v1/cache/clean` (需要认证)
-
-**请求体 (可选)：**
-```json
-{
-  "pattern": "*.tmp"
-}
-```
+**GET** `/api/v1/config`
 
 **响应示例：**
 ```json
 {
-  "success": true,
-  "cleaned": 125,
-  "freed": 1073741824,
-  "freed_formatted": "1.0 GB"
-}
-```
-
----
-
-### 清空缓存
-
-**DELETE** `/api/v1/cache` (需要认证)
-
-**响应示例：**
-```json
-{
-  "success": true,
-  "message": "Cache cleared",
-  "previous_size": "10.0 GB",
-  "entries_removed": 1520
+  "server_name": "HYC Download Station",
+  "version": "2.3.0",
+  "base_dir": "/downloads",
+  "directory_listing": true,
+  "max_upload_size": 1073741824,
+  "enable_stats": true,
+  "auth_type": "none",
+  "sort_by": "name",
+  "sort_reverse": false,
+  "ignore_hidden": true,
+  "enable_range": true,
+  "show_hash": false,
+  "calculate_hash": false,
+  "max_search_results": 100,
+  "api_version": "v1"
 }
 ```
 
@@ -546,182 +678,6 @@ curl -H "X-API-Key: $API_KEY" http://localhost:8080/api/v2/admin/stats
 
 ---
 
-## 认证管理
-
-### 验证认证状态
-
-**POST** `/api/v2/admin/auth/verify`
-
-**成功响应 (200)：**
-```json
-{
-  "valid": true,
-  "level": "admin",
-  "user_id": "admin",
-  "permissions": ["admin:*", "files:*", "sync:*"],
-  "expires_at": 1736841600
-}
-```
-
-**未认证响应 (401)：**
-```json
-{
-  "valid": false,
-  "error": "Invalid or expired token"
-}
-```
-
----
-
-### 列出 API 密钥
-
-**GET** `/api/v2/admin/keys` (需要 admin 权限)
-
-**响应示例：**
-```json
-{
-  "keys": [
-    {
-      "key_id": "ky_abc123",
-      "name": "Production API Key",
-      "level": "admin",
-      "created_at": 1705315200,
-      "last_used": 1705318800,
-      "expires_at": 1736851200,
-      "enabled": true,
-      "permissions": ["admin:*", "files:*", "sync:*"]
-    }
-  ],
-  "count": 2
-}
-```
-
----
-
-### 创建 API 密钥
-
-**POST** `/api/v2/admin/keys` (需要 admin 权限)
-
-**请求体：**
-```json
-{
-  "name": "New API Key",
-  "level": "user",
-  "expires_at": 1736851200,
-  "permissions": ["files:read", "stats:read"],
-  "allowed_ips": ["192.168.1.0/24"]
-}
-```
-
-**响应示例：**
-```json
-{
-  "success": true,
-  "key": {
-    "key_id": "ky_ghi789",
-    "key": "hyc_abc123def456...",
-    "name": "New API Key",
-    "level": "user",
-    "created_at": 1705315200,
-    "expires_at": 1736851200
-  },
-  "warning": "请立即保存密钥，关闭此页面后将无法再次查看"
-}
-```
-
----
-
-### 删除密钥
-
-**DELETE** `/api/v2/admin/keys/{key_id}` (需要 admin 权限)
-
-**响应示例：**
-```json
-{
-  "success": true,
-  "message": "API key deleted",
-  "key_id": "ky_abc123"
-}
-```
-
----
-
-### 禁用/启用密钥
-
-**PUT** `/api/v2/admin/keys/{key_id}/disable`
-**PUT** `/api/v2/admin/keys/{key_id}/enable`
-
-**响应示例：**
-```json
-{
-  "success": true,
-  "key_id": "ky_abc123",
-  "enabled": false
-}
-```
-
----
-
-### 列出活跃会话
-
-**GET** `/api/v2/admin/sessions` (需要 admin 权限)
-
-**响应示例：**
-```json
-{
-  "sessions": [
-    {
-      "session_id": "sess_abc123",
-      "user_id": "admin",
-      "level": "admin",
-      "created_at": 1705315200,
-      "last_activity": 1705318800,
-      "ip": "192.168.1.100",
-      "expires_at": 1736851200
-    }
-  ],
-  "count": 1
-}
-```
-
----
-
-### 销毁会话
-
-**DELETE** `/api/v2/admin/sessions/{session_id}` (需要 admin 权限)
-
-**响应示例：**
-```json
-{
-  "success": true,
-  "message": "Session destroyed",
-  "session_id": "sess_abc123"
-}
-```
-
----
-
-### 获取认证统计
-
-**GET** `/api/v2/admin/stats` (需要 admin 权限)
-
-**响应示例：**
-```json
-{
-  "total_keys": 15,
-  "enabled_keys": 12,
-  "disabled_keys": 3,
-  "expired_keys": 2,
-  "active_sessions": 5,
-  "keys_by_level": {
-    "admin": 3,
-    "user": 12
-  }
-}
-```
-
----
-
 ## Webhooks
 
 ### 列出 Webhooks
@@ -788,6 +744,1152 @@ curl -H "X-API-Key: $API_KEY" http://localhost:8080/api/v2/admin/stats
 
 ---
 
+## Minecraft 服务器核心 API
+
+### 获取核心列表
+
+**GET** `/api/v1/mc/corelist`
+
+**响应示例：**
+```json
+{
+  "corelist": [
+    {
+      "project": "paper",
+      "metadata": {
+        "current": "1.21.1"
+      },
+      "versions": ["1.21.1", "1.21", "1.20.6", "1.20.4"]
+    },
+    {
+      "project": "spigot",
+      "metadata": {
+        "current": "1.20.4"
+      },
+      "versions": ["1.20.4", "1.20.1", "1.19.4"]
+    }
+  ]
+}
+```
+
+---
+
+### 获取特定核心版本列表
+
+**GET** `/api/v1/mc/corelist/{name}`
+
+**响应示例：**
+```json
+{
+  "project": "paper",
+  "metadata": {
+    "current": "1.21.1"
+  },
+  "versions": ["1.21.1", "1.21", "1.20.6"]
+}
+```
+
+---
+
+### 获取所有版本
+
+**GET** `/api/v1/mc/versions`
+
+**GET** `/api/v1/mc/versions/{name}`
+
+**响应示例：**
+```json
+{
+  "core": "paper",
+  "versions": {
+    "paper": {
+      "1.21.1": [
+        {
+          "version": "1.21.1",
+          "file_name": "paper-1.21.1.jar",
+          "size": 47185920,
+          "modified": "2024-01-15T10:30:00"
+        }
+      ],
+      "1.21": [
+        {
+          "version": "1.21",
+          "file_name": "paper-1.21.jar",
+          "size": 46000000,
+          "modified": "2024-01-10T08:00:00"
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+### 获取核心信息
+
+**GET** `/api/v1/mc/info/{name}/{version}`
+
+**响应示例：**
+```json
+{
+  "core_name": "paper",
+  "version": "1.21.1",
+  "major_version": "1.21",
+  "file_name": "paper-1.21.1.jar",
+  "size": 47185920,
+  "size_formatted": "45.0 MB",
+  "modified": "2024-01-15T10:30:00",
+  "sha256": "abc123...",
+  "download_url": "/api/v1/mc/download/paper/1.21.1"
+}
+```
+
+---
+
+### 下载核心
+
+**GET** `/api/v1/mc/download/{name}/{version}`
+
+返回文件下载响应（302 重定向或直接文件流）
+
+---
+
+## 镜像站管理 API
+
+### 获取镜像站信息
+
+**GET** `/api/v1/mirror/info`
+
+**响应示例：**
+```json
+{
+  "server_name": "HYC Download Station",
+  "version": "2.3.0",
+  "uptime": 86400,
+  "total_files": 1520,
+  "total_size": 107374182400,
+  "api_version": "v1"
+}
+```
+
+---
+
+### 刷新镜像源
+
+**POST** `/api/v1/mirror/refresh` (需要认证)
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "message": "Mirror refresh initiated"
+}
+```
+
+---
+
+### 获取镜像状态
+
+**GET** `/api/v1/mirror/status`
+
+**响应示例：**
+```json
+{
+  "running": true,
+  "active_syncs": 2,
+  "completed_syncs": 1250,
+  "failed_syncs": 3,
+  "last_sync": "2024-01-15T02:00:00"
+}
+```
+
+---
+
+### 获取同步速度
+
+**GET** `/api/v1/mirror/speed`
+
+**响应示例：**
+```json
+{
+  "upload": 1024,
+  "download": 5120,
+  "unit": "KB/s"
+}
+```
+
+---
+
+### 获取带宽使用
+
+**GET** `/api/v1/mirror/bandwidth`
+
+**响应示例：**
+```json
+{
+  "total": 10737418240,
+  "used": 2147483648,
+  "percentage": 20.0
+}
+```
+
+---
+
+## API v2 - 增强版 API
+
+API v2 是 v1 的超集，添加了更多增强功能。
+
+### 认证 API
+
+#### 验证认证状态
+
+**POST** `/api/v2/admin/auth/verify`
+
+**成功响应 (200)：**
+```json
+{
+  "valid": true,
+  "level": "admin",
+  "user_id": "admin",
+  "permissions": ["admin:*", "files:*", "sync:*"],
+  "expires_at": null
+}
+```
+
+**未认证响应 (401)：**
+```json
+{
+  "valid": false,
+  "error": "Invalid or expired credentials"
+}
+```
+
+---
+
+### 增强搜索 API
+
+#### 增强搜索
+
+**GET** `/api/v2/search/enhanced`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| q | string | 是 | 搜索关键词 |
+| type | string | 否 | 搜索类型 (all, file, dir) |
+| mode | string | 否 | 搜索模式 (fuzzy, exact, regex) |
+| limit | integer | 否 | 返回结果数量限制 |
+| offset | integer | 否 | 偏移量 |
+
+**响应示例：**
+```json
+{
+  "query": "ubuntu",
+  "total": 25,
+  "results": [
+    {
+      "name": "ubuntu-22.04.iso",
+      "path": "ubuntu/ubuntu-22.04.iso",
+      "type": "file",
+      "size": 4588563456,
+      "size_formatted": "4.3 GB",
+      "modified": "2024-01-15T10:30:00"
+    }
+  ],
+  "search_mode": "fuzzy",
+  "took_ms": 15
+}
+```
+
+#### 按标签搜索
+
+**GET** `/api/v2/search/by-tag`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| tag | string | 是 | 标签名称 |
+| limit | integer | 否 | 返回结果数量限制 |
+
+#### 按日期搜索
+
+**GET** `/api/v2/search/by-date`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| from | string | 否 | 开始日期 (ISO格式) |
+| to | string | 否 | 结束日期 (ISO格式) |
+| order | string | 否 | 排序 (asc, desc) |
+
+---
+
+### 增强统计 API
+
+#### 详细统计
+
+**GET** `/api/v2/stats/detailed`
+
+**响应示例：**
+```json
+{
+  "total_files": 1520,
+  "total_dirs": 245,
+  "total_size": 107374182400,
+  "total_size_formatted": "100.0 GB",
+  "downloads_total": 52340,
+  "downloads_today": 1250,
+  "downloads_week": 8750,
+  "file_types": {
+    "application/octet-stream": 850,
+    "text/plain": 320,
+    "image/png": 150
+  },
+  "top_downloads": [
+    {"path": "ubuntu-22.04.iso", "count": 1523}
+  ]
+}
+```
+
+#### 热门文件
+
+**GET** `/api/v2/stats/trending`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| period | string | 否 | 时间周期 (day, week, month) |
+| limit | integer | 否 | 返回数量限制 |
+
+#### 下载趋势
+
+**GET** `/api/v2/stats/download-trend`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| from | string | 否 | 开始日期 |
+| to | string | 否 | 结束日期 |
+| period | string | 否 | 聚合周期 (hour, day, week) |
+
+#### 按周期下载统计
+
+**GET** `/api/v2/stats/download-by-period`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| period | string | 否 | 周期 (hour, day, week, month) |
+| limit | integer | 否 | 返回数量限制 |
+
+#### 下载排行
+
+**GET** `/api/v2/stats/rank`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 否 | 排行类型 (downloads, size, recent) |
+| limit | integer | 否 | 返回数量限制 |
+
+---
+
+### 文件操作 API
+
+#### 文件元数据
+
+**GET** `/api/v2/file/{path}/metadata`
+
+**PUT** `/api/v2/file/{path}/metadata` (需要认证)
+
+**请求体：**
+```json
+{
+  "tags": ["linux", "os", "lts"],
+  "description": "Ubuntu 22.04 LTS Server",
+  "custom_fields": {
+    "version": "22.04",
+    "architecture": "amd64"
+  }
+}
+```
+
+**响应示例：**
+```json
+{
+  "path": "ubuntu-22.04.iso",
+  "name": "ubuntu-22.04.iso",
+  "size": 4588563456,
+  "modified": "2024-01-15T10:30:00",
+  "tags": ["linux", "os", "lts"],
+  "description": "Ubuntu 22.04 LTS Server",
+  "custom_fields": {
+    "version": "22.04",
+    "architecture": "amd64"
+  },
+  "created_at": "2024-01-10T08:00:00",
+  "last_accessed": "2024-01-15T10:30:00"
+}
+```
+
+#### 文件版本
+
+**GET** `/api/v2/file/{path}/versions`
+
+**POST** `/api/v2/file/{path}/versions` (需要认证)
+
+**响应示例：**
+```json
+{
+  "path": "config.json",
+  "current_version": 3,
+  "versions": [
+    {
+      "version": 3,
+      "modified": "2024-01-15T10:30:00",
+      "modified_by": "admin",
+      "size": 2048,
+      "changes": "Updated timeout settings"
+    },
+    {
+      "version": 2,
+      "modified": "2024-01-10T08:00:00",
+      "modified_by": "admin",
+      "size": 1920,
+      "changes": "Added new endpoints"
+    }
+  ]
+}
+```
+
+#### 缩略图
+
+**GET** `/api/v2/file/{path}/thumbnail`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| size | string | 否 | 尺寸 (small, medium, large) |
+
+**响应：** 图片文件或 404
+
+#### 批量元数据操作
+
+**GET** `/api/v2/metadata/batch`
+
+**PUT** `/api/v2/metadata/batch` (需要认证)
+
+**请求体：**
+```json
+{
+  "files": ["file1.txt", "file2.txt"],
+  "action": "add_tags",
+  "tags": ["batch", "uploaded"]
+}
+```
+
+---
+
+### 监控 API
+
+#### 实时监控
+
+**GET** `/api/v2/monitor/realtime`
+
+**响应示例：**
+```json
+{
+  "cpu": {
+    "percent": 35.5,
+    "cores": 4,
+    "freq_mhz": 2400
+  },
+  "memory": {
+    "total": 8589934592,
+    "used": 3221225472,
+    "percent": 37.5,
+    "available": 5368709120
+  },
+  "disk": {
+    "total": 536870912000,
+    "used": 107374182400,
+    "percent": 20.0,
+    "read_bytes": 10485760,
+    "write_bytes": 5242880
+  },
+  "network": {
+    "rx_bytes": 1048576000,
+    "tx_bytes": 524288000,
+    "rx_speed": "1.2 MB/s",
+    "tx_speed": "512 KB/s",
+    "connections": 45
+  },
+  "uptime": 86400,
+  "timestamp": "2024-01-15T10:30:00"
+}
+```
+
+#### 监控历史
+
+**GET** `/api/v2/monitor/history`
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| metric | string | 否 | 指标类型 (cpu, memory, disk, network) |
+| from | string | 否 | 开始时间 |
+| to | string | 否 | 结束时间 |
+| interval | string | 否 | 采样间隔 |
+
+#### 详细监控
+
+**GET** `/api/v2/monitor/detailed`
+
+---
+
+### 健康检查 API
+
+#### 镜像源健康检查
+
+**GET** `/api/v2/health/sources`
+
+**响应示例：**
+```json
+{
+  "sources": [
+    {
+      "name": "ubuntu-releases",
+      "status": "healthy",
+      "latency_ms": 45,
+      "last_check": "2024-01-15T10:25:00",
+      "success_rate": 99.5
+    },
+    {
+      "name": "debian-cd",
+      "status": "degraded",
+      "latency_ms": 120,
+      "last_check": "2024-01-15T10:25:00",
+      "success_rate": 95.0,
+      "message": "High latency detected"
+    }
+  ],
+  "total": 5,
+  "healthy": 4,
+  "degraded": 1,
+  "unhealthy": 0
+}
+```
+
+#### 检查特定镜像源
+
+**GET** `/api/v2/health/check/{name}
+
+**响应示例：**
+```json
+{
+  "name": "ubuntu-releases",
+  "status": "healthy",
+  "latency_ms": 45,
+  "http_code": 200,
+  "last_check": "2024-01-15T10:30:00",
+  "message": "Connection successful"
+}
+```
+
+#### 故障切换
+
+**GET** `/api/v2/health/failover`
+
+**响应示例：**
+```json
+{
+  "enabled": true,
+  "auto_failover": true,
+  "current_primary": "ubuntu-releases",
+  "fallback": "ubuntu-alternate",
+  "failover_count": 2,
+  "last_failover": "2024-01-14T02:00:00"
+}
+```
+
+**POST** `/api/v2/health/failover/{type}` (需要认证)
+
+触发手动故障切换
+
+#### 健康检查统计
+
+**GET** `/api/v2/health/stats`
+
+---
+
+### Webhooks API
+
+#### 列出 Webhooks
+
+**GET** `/api/v2/webhooks` (需要 admin 权限)
+
+**响应示例：**
+```json
+{
+  "webhooks": [
+    {
+      "id": "wh_abc123",
+      "name": "Download Notification",
+      "url": "https://example.com/webhook",
+      "events": ["download", "sync.complete"],
+      "enabled": true,
+      "created_at": "2024-01-10T10:00:00",
+      "last_triggered": "2024-01-15T10:25:00",
+      "trigger_count": 1250,
+      "success_rate": 99.8
+    }
+  ],
+  "count": 1
+}
+```
+
+#### 创建 Webhook
+
+**POST** `/api/v2/webhooks` (需要 admin 权限)
+
+**请求体：**
+```json
+{
+  "name": "New Webhook",
+  "url": "https://example.com/webhook",
+  "events": ["download", "sync.complete"],
+  "secret": "webhook-secret-key",
+  "headers": {
+    "X-Custom-Header": "value"
+  }
+}
+```
+
+#### 获取 Webhook
+
+**GET** `/api/v2/webhooks/{id}` (需要 admin 权限)
+
+#### 更新 Webhook
+
+**PUT** `/api/v2/webhooks/{id}` (需要 admin 权限)
+
+#### 删除 Webhook
+
+**DELETE** `/api/v2/webhooks/{id}` (需要 admin 权限)
+
+#### 测试 Webhook
+
+**POST** `/api/v2/webhooks/{id}/test` (需要 admin 权限)
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "webhook_id": "wh_abc123",
+  "status_code": 200,
+  "response_time": 150,
+  "response_body": "{\"status\":\"ok\"}"
+}
+```
+
+#### Webhook 交付历史
+
+**GET** `/api/v2/webhooks/{id}/deliveries` (需要 admin 权限)
+
+#### Webhook 统计
+
+**GET** `/api/v2/webhooks/{id}/stats` (需要 admin 权限)
+
+---
+
+### 同步管理 API
+
+#### 获取同步源
+
+**GET** `/api/v2/sync/sources` (需要认证)
+
+**POST** `/api/v2/sync/sources` (需要认证)
+
+#### 控制同步
+
+**POST** `/api/v2/sync/{name}/start` (需要认证)
+
+**POST** `/api/v2/sync/{name}/stop` (需要认证)
+
+**GET** `/api/v2/sync/{name}/status` (需要认证)
+
+#### 同步历史
+
+**GET** `/api/v2/sync/history` (需要认证)
+
+#### 同步软件包
+
+**POST** `/api/v2/sync/packages` (需要认证)
+
+**GET** `/api/v2/sync/packages/{name}/status` (需要认证)
+
+---
+
+### 缓存管理 API
+
+#### 缓存统计
+
+**GET** `/api/v2/cache/stats` (需要认证)
+
+#### 清理缓存
+
+**POST** `/api/v2/cache/clean` (需要认证)
+
+**请求体：**
+```json
+{
+  "pattern": "*.tmp",
+  "older_than": 86400
+}
+```
+
+#### 缓存使用
+
+**GET** `/api/v2/cache/usage` (需要认证)
+
+**响应示例：**
+```json
+{
+  "total_size": 10737418240,
+  "total_size_formatted": "10.0 GB",
+  "file_count": 1520,
+  "by_type": {
+    "pypi": 5368709120,
+    "npm": 2684354560,
+    "docker": 2147483648
+  }
+}
+```
+
+#### 热门缓存
+
+**GET** `/api/v2/cache/popular` (需要认证)
+
+---
+
+### 缓存预热 API
+
+#### 预热状态
+
+**GET** `/api/v2/cache/prewarm` (需要认证)
+
+**POST** `/api/v2/cache/prewarm` (需要认证)
+
+**请求体：**
+```json
+{
+  "urls": [
+    "https://pypi.org/packages/source/d/django/Django-5.0.tar.gz",
+    "https://registry.npmjs.org/react/-/react-18.2.0.tgz"
+  ],
+  "priority": "high"
+}
+```
+
+#### 预热统计
+
+**GET** `/api/v2/cache/prewarm/stats` (需要认证)
+
+#### 预热项目
+
+**GET** `/api/v2/cache/prewarm/items` (需要认证)
+
+**POST** `/api/v2/cache/prewarm/items` (需要认证)
+
+#### 预热历史
+
+**GET** `/api/v2/cache/prewarm/history` (需要认证)
+
+#### 清空预热队列
+
+**POST** `/api/v2/cache/prewarm/clear` (需要认证)
+
+#### 热门预热
+
+**GET** `/api/v2/cache/prewarm/popular` (需要认证)
+
+**POST** `/api/v2/cache/prewarm/popular` (需要认证)
+
+#### 预热配置
+
+**GET** `/api/v2/cache/prewarm/config` (需要认证)
+
+**PUT** `/api/v2/cache/prewarm/config` (需要认证)
+
+---
+
+### 镜像加速 API
+
+#### 列出镜像
+
+**GET** `/api/v2/mirrors` (需要认证)
+
+**POST** `/api/v2/mirrors` (需要认证)
+
+**请求体：**
+```json
+{
+  "name": "pypi-cn",
+  "type": "pypi",
+  "url": "https://pypi.cn",
+  "enabled": true
+}
+```
+
+#### 管理镜像
+
+**PUT** `/api/v2/mirrors/{name}` (需要认证)
+
+**DELETE** `/api/v2/mirrors/{name}` (需要认证)
+
+#### 启用/禁用镜像
+
+**PUT** `/api/v2/mirrors/{name}/enable` (需要认证)
+
+**请求体：**
+```json
+{
+  "enabled": true
+}
+```
+
+#### 刷新镜像
+
+**POST** `/api/v2/mirrors/{name}/refresh` (需要认证)
+
+#### PyPI 镜像
+
+**GET** `/api/v2/mirrors/pypi/{path}`
+
+#### NPM 镜像
+
+**GET** `/api/v2/mirrors/npm/{path}`
+
+#### Go 镜像
+
+**GET** `/api/v2/mirrors/go/{path}`
+
+#### Docker 镜像
+
+**GET** `/api/v2/mirrors/docker/{path}`
+
+---
+
+### 用户管理 API
+
+#### 用户登录
+
+**POST** `/api/v2/user/login`
+
+**请求体：**
+```json
+{
+  "username": "admin",
+  "password": "password123"
+}
+```
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "expires_at": 1736841600
+}
+```
+
+#### 修改密码
+
+**POST** `/api/v2/user/password` (需要认证)
+
+**请求体：**
+```json
+{
+  "old_password": "oldpassword",
+  "new_password": "newpassword123"
+}
+```
+
+#### 登录日志
+
+**GET** `/api/v2/user/login-logs` (需要认证)
+
+---
+
+### 配置管理 API
+
+#### 获取配置
+
+**GET** `/api/v2/config` (需要 admin 权限)
+
+**PUT** `/api/v2/config` (需要 admin 权限)
+
+#### 重载配置
+
+**POST** `/api/v2/config/reload` (需要 admin 权限)
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "message": "Configuration reloaded",
+  "changes": 3
+}
+```
+
+#### 配置变更历史
+
+**GET** `/api/v2/config/changes` (需要 admin 权限)
+
+---
+
+### 告警管理 API
+
+#### 获取告警
+
+**GET** `/api/v2/alerts` (需要认证)
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| severity | string | 否 | 严重程度 (info, warning, error, critical) |
+| acknowledged | boolean | 否 | 是否已确认 |
+| limit | integer | 否 | 返回数量限制 |
+
+**响应示例：**
+```json
+{
+  "alerts": [
+    {
+      "id": "alert_001",
+      "severity": "warning",
+      "title": "High CPU Usage",
+      "message": "CPU usage above 80% for 5 minutes",
+      "timestamp": "2024-01-15T10:30:00",
+      "acknowledged": false,
+      "source": "monitor"
+    }
+  ],
+  "count": 1,
+  "unacknowledged": 1
+}
+```
+
+#### 确认告警
+
+**POST** `/api/v2/alerts/{id}/acknowledge` (需要认证)
+
+#### 清空告警
+
+**POST** `/api/v2/alerts/clear` (需要 admin 权限)
+
+**请求体：**
+```json
+{
+  "severity": "info",
+  "older_than": 86400
+}
+```
+
+#### 测试告警
+
+**POST** `/api/v2/alerts/test` (需要 admin 权限)
+
+**请求体：**
+```json
+{
+  "type": "email",
+  "recipients": ["admin@example.com"]
+}
+```
+
+#### 告警配置
+
+**GET** `/api/v2/alerts/config` (需要 admin 权限)
+
+**PUT** `/api/v2/alerts/config` (需要 admin 权限)
+
+**请求体：**
+```json
+{
+  "email": {
+    "enabled": true,
+    "smtp_host": "smtp.example.com",
+    "smtp_port": 587,
+    "recipients": ["admin@example.com"]
+  },
+  "webhook": {
+    "enabled": true,
+    "url": "https://example.com/alerts"
+  },
+  "rules": [
+    {
+      "name": "High CPU",
+      "condition": "cpu.percent > 80",
+      "severity": "warning",
+      "actions": ["email", "webhook"]
+    }
+  ]
+}
+```
+
+---
+
+### Prometheus 指标
+
+**GET** `/api/v2/metrics`
+
+返回 Prometheus 格式的指标数据。
+
+---
+
+### 活动日志 API
+
+**GET** `/api/v2/activity` (需要认证)
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 否 | 活动类型 |
+| limit | integer | 否 | 返回数量限制 |
+| offset | integer | 否 | 偏移量 |
+
+**响应示例：**
+```json
+{
+  "activities": [
+    {
+      "id": 1001,
+      "type": "file.download",
+      "user": "admin",
+      "path": "ubuntu-22.04.iso",
+      "ip": "192.168.1.100",
+      "timestamp": "2024-01-15T10:30:00",
+      "details": {
+        "size": "4.3 GB"
+      }
+    }
+  ],
+  "count": 1,
+  "total": 52340
+}
+```
+
+---
+
+### 服务器管理 API
+
+#### 重启管理
+
+**GET** `/api/v2/server/restart` (需要认证)
+
+**POST** `/api/v2/server/restart` (需要 admin 权限)
+
+**请求体：**
+```json
+{
+  "schedule": "2024-01-15T23:00:00",
+  "notify_users": true
+}
+```
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "scheduled": true,
+  "restart_time": "2024-01-15T23:00:00",
+  "pending_requests": 15
+}
+```
+
+#### 确认重启
+
+**POST** `/api/v2/server/restart/confirm` (需要认证)
+
+#### 立即重启
+
+**POST** `/api/v2/server/restart/immediate` (需要 admin 权限)
+
+#### 待处理请求
+
+**GET** `/api/v2/server/restart/pending` (需要 admin 权限)
+
+#### 重启历史
+
+**GET** `/api/v2/server/restart/history` (需要 admin 权限)
+
+#### 重启配置
+
+**GET** `/api/v2/server/restart/config` (需要 admin 权限)
+
+**PUT** `/api/v2/server/restart/config` (需要 admin 权限)
+
+**请求体：**
+```json
+{
+  "require_confirmation": true,
+  "confirmation_timeout": 300,
+  "notify_before_restart": true,
+  "notify_seconds_before": 60,
+  "allowed_users": ["admin"]
+}
+```
+
+#### 服务器信息
+
+**GET** `/api/v2/server/info`
+
+**响应示例：**
+```json
+{
+  "version": "2.3.0",
+  "uptime": 86400,
+  "hostname": "hyc-server",
+  "platform": "Linux",
+  "platform_version": "Ubuntu 22.04",
+  "python_version": "3.11.0",
+  "arch": "x86_64",
+  "cpu_count": 4,
+  "memory_total": 8589934592,
+  "disk_total": 536870912000,
+  "started_at": "2024-01-14T10:30:00"
+}
+```
+
+---
+
+### API 文档 API
+
+#### 获取 API 文档
+
+**GET** `/api/v2/api-docs.json`
+
+**GET** `/api/v2/api-docs.yaml`
+
+#### 生成 API 文档
+
+**POST** `/api/v2/api-docs/generate` (需要 admin 权限)
+
+---
+
 ## WebSocket
 
 ### 连接
@@ -840,5 +1942,5 @@ curl -H "X-API-Key: $API_KEY" http://localhost:8080/api/v2/admin/stats
 
 ---
 
-> 最后更新: 2024-01-15
-> 版本: 2.2.0
+> 最后更新: 2026-02-19
+> 版本: 2.3.0

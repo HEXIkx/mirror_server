@@ -110,7 +110,7 @@ python main.py --disable-hash
 ### 方式一: 使用预编译镜像
 ```bash
 # 拉取 ARM64 镜像
-docker pull hyc-download-station:v2.2-arm64
+docker pull hx100cv/hyc-download-station:v2.3-arm64
 
 # 运行
 docker run -d \
@@ -118,7 +118,7 @@ docker run -d \
   -p 8080:8080 \
   -v ./data:/data \
   -v ./downloads:/downloads \
-  hyc-download-station:v2.2-arm64
+  hyc-download-station:v2.3-arm64
 ```
 
 ### 方式二: 使用 Docker Compose
@@ -146,7 +146,7 @@ python main.py --check-compat
 输出示例:
 ```
 ========================================
-  HYC下载站 v2.2 - 兼容性检查
+  HYC下载站 v2.3 - 兼容性检查
 ========================================
 
 系统信息:
@@ -177,12 +177,12 @@ python main.py --check-compat
 ### 构建镜像
 ```bash
 # 构建所有架构
-./scripts/build-multiarch.sh v2.2 hyc-download-station
+./scripts/build-multiarch.sh v2.3 hyc-download-station
 
 # 或手动构建
 docker buildx build \
   --platform linux/amd64,linux/arm64,linux/arm/v7 \
-  --tag hyc-download-station:v2.2 \
+  --tag hx100cv/hyc-download-station:v2.3 \
   --file docker/Dockerfile.multiarch \
   --push .
 ```
@@ -192,21 +192,21 @@ docker buildx build \
 # ARMv7
 docker build \
   --platform linux/arm/v7 \
-  --tag hyc-download-station:v2.2-armv7 \
+  --tag hx100cv/hyc-download-station:v2.3-armv7 \
   --file docker/Dockerfile.lite \
   --push .
 
 # ARM64
 docker build \
   --platform linux/arm64 \
-  --tag hyc-download-station:v2.2-arm64 \
+  --tag hx100cv/hyc-download-station:v2.3-arm64 \
   --file docker/Dockerfile.lite \
   --push .
 
 # i386 (32位)
 docker build \
   --platform linux/386 \
-  --tag hyc-download-station:v2.2-i386 \
+  --tag hx100cv/hyc-download-station:v2.3-i386 \
   --file docker/Dockerfile.lite \
   --push .
 ```

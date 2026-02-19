@@ -1,5 +1,5 @@
 # ============================================
-# HYC下载站 v2.2 - Kubernetes 部署指南
+# HYC下载站 v2.3 - Kubernetes 部署指南
 # ============================================
 
 ## 快速部署
@@ -48,10 +48,10 @@ kubectl port-forward svc/hyc-server 8080:8080
 ### 1. 构建并推送镜像
 ```bash
 # 构建镜像
-docker build -t your-registry/hyc-download-station:v2.2 .
+docker build -t hx100cv/hyc-download-station:v2.3 .
 
 # 推送镜像
-docker push your-registry/hyc-download-station:v2.2
+docker push hx100cv/hyc-download-station:v2.3
 
 # 更新 deployment.yaml 中的镜像地址
 ```
@@ -135,7 +135,7 @@ kubectl logs -l app=hyc-download-server -f
 
 ```bash
 # 更新镜像版本
-kubectl set image deployment/hyc-server hyc-server=your-registry/hyc-download-station:v2.3
+kubectl set image deployment/hyc-server hyc-server=hx100cv/hyc-download-station:v2.4
 
 # 查看滚动更新
 kubectl rollout status deployment/hyc-server

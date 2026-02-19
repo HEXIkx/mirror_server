@@ -1,15 +1,15 @@
-# HYC下载站 v2.2
+# HYC下载站 v2.3
 
 模块化重构的Python镜像文件服务器，支持API版本化、实时通信、系统监控、数据库集成等高级功能。
 
 ## 项目结构
 
 ```
-vs1/
+mirror_server/
 ├── main.py                      # 主入口文件
 ├── requirements.txt             # 依赖列表
 ├── settings.json                # 主配置文件
-├── config.example.json          # 配置文件示例
+├── auth_token.txt              # 认证令牌文件
 ├── api/                         # API模块
 │   ├── __init__.py
 │   ├── router.py                # API路由器
@@ -22,14 +22,14 @@ vs1/
 ├── core/                        # 核心模块
 │   ├── __init__.py
 │   ├── config.py                # 配置管理
-│   ├── config_hotreload.py     # 配置热重载
+│   ├── config_hotreload.py      # 配置热重载
 │   ├── utils.py                 # 工具函数
 │   ├── server.py                # 服务器核心
 │   ├── database.py              # 数据库管理
 │   ├── mirror_sync.py           # 镜像同步管理
 │   ├── sync_scheduler.py        # 同步调度器
 │   ├── sync_engine.py           # 同步引擎
-│   ├── cache_manager.py         # 缓存管理
+│   ├── cache_manager.py          # 缓存管理
 │   ├── cache_prewarm.py         # 缓存预热
 │   ├── monitor.py               # 系统监控
 │   ├── health_check.py          # 健康检查
@@ -44,8 +44,17 @@ vs1/
 ├── handlers/                    # HTTP请求处理器
 │   ├── __init__.py
 │   └── http_handler.py          # HTTP请求处理
-├── api/ui/                      # Web管理界面
+├── mirrors/                     # 镜像加速源模块
+│   ├── __init__.py
+│   ├── http.py                  # HTTP/HTTPS镜像
+│   ├── docker.py                # Docker Hub镜像
+│   ├── apt.py                  # APT镜像
+│   ├── yum.py                  # YUM镜像
+│   ├── pypi.py                 # PyPI镜像
+│   ├── npm.py                  # npm镜像
+│   └── go.py                   # Go镜像
 ├── scripts/                     # 辅助脚本
+├── data/                        # 数据目录
 ├── docker/                      # Docker配置
 └── k8s/                        # Kubernetes配置
 ```
@@ -473,7 +482,7 @@ HTTPS配置:
 - **health_check.py**: 健康检查，系统组件状态检测
 - **alerts.py**: 告警系统，异常情况自动告警
 - **security.py**: 安全模块，防护和审计
-- **api_auth.py**: API认证，Token/Key/Session管理
+- **api_auth.py**: API认证，Token/Basic认证
 - **api_docs.py**: API文档自动生成
 - **optimization.py**: 性能优化，自动检测设备配置
 - **scheduler.py**: 通用任务调度器
@@ -485,10 +494,10 @@ HTTPS配置:
 - **router.py**: API路由器，支持版本化
 - **v1.py**: API v1实现（基础功能）
 - **v2.py**: API v2实现（增强功能，继承v1）
-- **admin.py**: 管理接口，密钥/会话/Webhooks管理
+- **admin.py**: 管理接口，Webhooks管理
 - **ws_handler.py**: WebSocket处理，实时双向通信
 - **sse_handler.py**: SSE事件流，单向实时推送
-- **ui/**: Web管理界面
+- **docs/**: API文档 (index.html, api.md)
 
 ### handlers/ - HTTP请求处理器
 
@@ -501,7 +510,7 @@ HTTPS配置:
 - ✅ 镜像同步（HTTP/HTTPS、FTP、SFTP、Rsync、Git、S3/OSS/COS、WebDAV、本地目录）
 - ✅ 文件上传下载（支持断点续传）
 - ✅ 目录浏览（镜像站风格）
-- ✅ 认证支持（无、基本认证、令牌认证、API Key）
+- ✅ 认证支持（无、基本认证、令牌认证）
 - ✅ HTTPS支持
 - ✅ 下载统计
 - ✅ 文件搜索（基础/增强/正则）
